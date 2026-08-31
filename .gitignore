@@ -180,3 +180,7 @@ cython_debug/
 .cursorignore
 .cursorindexingignore*.db
 *.sqlite3
+
+# macOS
+.DS_Store
+
