@@ -1,7 +1,7 @@
-#kullanici
+#kullanıcı
 #   kimlik (int, PK)
-#   eposta (string, UK)
-#   parola_özeti (string)
+#   e_posta (string, UK)
+#   parola_özeti (string(255))
 #   oluşturma_zamanı (datetime)
 
 #anket
