@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="utf-8">
+    <title>{% block başlık %}Anket Uygulaması{% endblock %}</title>
+</head>
+
+<body>
+    <nav>
+        <a href="{{ url_for('ana_sayfa') }}">Ana sayfa</a>
+        {% if oturum_kullanıcısı %}
+        <span>{{ oturum_kullanıcısı.e_posta }}</span>
+        <a href="{{ url_for('çıkış') }}">Çıkış yap</a>
+        {% else %}
+        <a href="{{ url_for('giriş_ekranı') }}">Giriş yap</a>
+        <a href="{{ url_for('kayıt_ekranı') }}">Kayıt ol</a>
+        {% endif %}
+    </nav>
+    {% if hata %}<p>{{ hata }}</p>{% endif %}
+    {% block içerik %}{% endblock %}
+</body>
+
+</html>
