@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="utf-8">
+    <title>Anket Uygulaması</title>
+</head>
+
+<body>
+    <h1>Anket Uygulaması</h1>
+    {% if kullanıcı %}
+    <p>{{ kullanıcı.e_posta }} olarak giriş yapıldı.</p>
+    <p><a href="{{ url_for('çıkış') }}">Çıkış yap</a></p>
+    {% else %}
+    <p><a href="{{ url_for('giriş_ekranı') }}">Giriş yap</a></p>
+    <p><a href="{{ url_for('kayıt_ekranı') }}">Kayıt ol</a></p>
+    {% endif %}
+</body>
+
+</html>

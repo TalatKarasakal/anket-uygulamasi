@@ -7,7 +7,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 @uygulama.route("/")
 def ana_sayfa():
-    return "Anket Uygulaması"
+    kimlik = session.get("kullanıcı_kimlik")
+    kullanıcı = db.session.get(Kullanıcı, kimlik) if kimlik else None
+    return render_template("ana_sayfa.html", kullanıcı=kullanıcı)
 
 @uygulama.route("/kayit", methods=["GET", "POST"])
 def kayıt_ekranı():
@@ -50,3 +52,8 @@ def giriş_ekranı():
         session["kullanıcı_kimlik"] = kullanıcı.kimlik
         return redirect(url_for("ana_sayfa"))
     return render_template("giris.html")
+
+@uygulama.route("/çıkış")
+def çıkış():
+    session.pop("kullanıcı_kimlik", None)
+    return redirect(url_for("ana_sayfa"))
