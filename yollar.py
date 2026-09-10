@@ -1,6 +1,6 @@
 from uygulama import uygulama
 from uzantılar import db
-from modeller import Kullanıcı
+from modeller import Kullanıcı, Anket
 from email_validator import validate_email, EmailNotValidError
 from flask import render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -57,7 +57,25 @@ def çıkış():
     return redirect(url_for("ana_sayfa"))
 
 @uygulama.route("/anket/yeni", methods=["GET", "POST"])
+def anket_oluşturma():
+    kimlik = session.get("kullanıcı_kimlik")
 
+    if not kimlik:
+        return redirect(url_for("giriş_ekranı"))
+
+    if request.method == "POST":
+        başlık = request.form["başlık"]
+        açıklama = request.form["açıklama"]
+        anonim_mi = "anonim_mi" in request.form
+        if not başlık.strip():
+            return render_template("anket_yeni.html", hata="Başlık boş bırakılamaz")
+
+        herkese_açık_mı = "herkese_açık_mı" in request.form
+        anket = Anket(başlık=başlık, açıklama=açıklama, anonim_mi=anonim_mi, herkese_açık_mı=herkese_açık_mı, sahip_kimlik=kimlik)
+        db.session.add(anket)
+        db.session.commit()
+        return redirect(url_for("ana_sayfa"))
+    return render_template("anket_yeni.html")
 
 @uygulama.context_processor
 def oturum_bilgisi():

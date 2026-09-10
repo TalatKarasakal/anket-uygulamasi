@@ -1,0 +1,12 @@
+{% extends "taban.html" %}
+{% block başlık %}Yeni Anket{% endblock %}
+{% block içerik %}
+<h1>Yeni Anket</h1>
+<form method="post">
+    <p><label>Başlık <input type="text" name="başlık" maxlength="50" required></label></p>
+    <p><label>Açıklama <textarea name="açıklama"></textarea></label></p>
+    <p><label><input type="checkbox" name="anonim_mi"> Anonim</label></p>
+    <p><label><input type="checkbox" name="herkese_açık_mı"> Herkese açık</label></p>
+    <button type="submit">Oluştur</button>
+</form>
+{% endblock %}
