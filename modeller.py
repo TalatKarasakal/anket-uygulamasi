@@ -30,6 +30,7 @@ class Soru(db.Model):
     ölçek_alt_sınırı = db.Column(db.Integer, nullable=True)
     ölçek_üst_sınırı = db.Column(db.Integer, nullable=True)
     anket = db.relationship("Anket", back_populates="sorular")
+    seçenekler = db.relationship("Seçenek", back_populates="soru", cascade="all, delete-orphan", order_by="Seçenek.sıra")
 
 class Seçenek(db.Model):
     __tablename__ = "seçenek"
@@ -37,6 +38,7 @@ class Seçenek(db.Model):
     soru_kimlik = db.Column(db.Integer, db.ForeignKey("soru.kimlik"), nullable=False)
     metin = db.Column(db.String(255), nullable=False)
     sıra = db.Column(db.Integer, nullable=False)
+    soru = db.relationship("Soru", back_populates="seçenekler")
 
 class Yanıt(db.Model):
     __tablename__ = "yanıt"

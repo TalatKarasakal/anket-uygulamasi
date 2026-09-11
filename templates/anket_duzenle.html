@@ -6,9 +6,12 @@
 <h2>Sorular</h2>
 <ul>
     {% for soru in anket.sorular %}
-    <li>{{ soru.metin }} ({{ soru.tip }})</li>
-    {% else %}
-    <li>Henüz soru eklenmemiş.</li>
+    <li>
+        {{ soru.metin }} ({{ soru.tip }})
+        {% if soru.seçenekler %}
+        <ul>{% for seçenek in soru.seçenekler %}<li>{{ seçenek.metin }}</li>{% endfor %}</ul>
+        {% endif %}
+    </li>
     {% endfor %}
 </ul>
 
@@ -29,6 +32,10 @@
     <p><label>Ölçek üst sınırı <input type="number" name="ölçek_üst_sınırı"></label></p>
     <p><label><input type="checkbox" name="zorunlu_mu"> Zorunlu</label></p>
     <button type="submit">Ekle</button>
+
+    <p>Seçenekler</p>
+    <p><input type="text" name="seçenek"></p>
+    <p><input type="text" name="seçenek"></p>
 </form>
 
 

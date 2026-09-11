@@ -1,6 +1,6 @@
 from uygulama import uygulama
 from uzantılar import db
-from modeller import Kullanıcı, Anket, Soru
+from modeller import Kullanıcı, Anket, Soru, Seçenek
 from email_validator import validate_email, EmailNotValidError
 from flask import render_template, request, redirect, url_for, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -120,6 +120,12 @@ def soru_ekleme(anket_kimlik):
             if ölçek_alt_sınırı >= ölçek_üst_sınırı:
                 return render_template("anket_duzenle.html", anket=anket, hata="Alt sınır üst sınırdan küçük olmalıdır")
 
+        seçenekler = []
+        if tip == "çoktan seçmeli":
+            seçenekler = [s.strip() for s in request.form.getlist("seçenek") if s.strip()]
+            if len(seçenekler) < 2:
+                return render_template("anket_duzenle.html", anket=anket, hata="Seçenek en az 2 olmalıdır")
+
         soru = Soru(
             metin=metin,
             tip=tip,
@@ -129,6 +135,10 @@ def soru_ekleme(anket_kimlik):
             ölçek_alt_sınırı=ölçek_alt_sınırı,
             ölçek_üst_sınırı=ölçek_üst_sınırı
         )
+
+        for sıra, seçenek_metni in enumerate(seçenekler, start=1):
+            soru.seçenekler.append(Seçenek(metin=seçenek_metni, sıra=sıra))
+
         db.session.add(soru)
         db.session.commit()
         return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
