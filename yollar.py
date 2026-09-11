@@ -7,7 +7,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 @uygulama.route("/")
 def ana_sayfa():
-    return render_template("ana_sayfa.html")
+    kimlik = session.get("kullanıcı_kimlik")
+    anketler = []
+    if kimlik:
+        anketler = db.session.execute(
+            db.select(Anket).where(Anket.sahip_kimlik == kimlik)
+        ).scalars().all()
+    return render_template("ana_sayfa.html", anketler=anketler)
 
 @uygulama.route("/kayit", methods=["GET", "POST"])
 def kayıt_ekranı():

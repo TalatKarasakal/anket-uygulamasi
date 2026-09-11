@@ -4,4 +4,16 @@
 {% if oturum_kullanıcısı %}
 <p><a href="{{ url_for('anket_oluşturma') }}">Yeni anket oluştur</a></p>
 {% endif %}
+
+{% if oturum_kullanıcısı %}
+<h2>Anketlerim</h2>
+<ul>
+    {% for anket in anketler %}
+    <li>{{ anket.başlık }}</li>
+    {% else %}
+    <li>Henüz anketiniz yok.</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
 {% endblock %}
