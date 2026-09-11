@@ -106,8 +106,29 @@ def soru_ekleme(anket_kimlik):
         tip = request.form["tip"]
         zorunlu_mu = "zorunlu_mu" in request.form
         if not metin.strip():
-            return render_template("anket_duzenle.html", hata="Metin boş bırakılamaz")
-        soru = Soru(metin=metin, tip=tip, zorunlu_mu=zorunlu_mu, anket_kimlik=anket_kimlik, sıra=len(anket.sorular) + 1)
+            return render_template("anket_duzenle.html", anket=anket, hata="Metin boş bırakılamaz")
+
+        ölçek_alt_sınırı = None
+        ölçek_üst_sınırı = None
+        if tip == "ölçek":
+            try:
+                ölçek_alt_sınırı = int(request.form["ölçek_alt_sınırı"])
+                ölçek_üst_sınırı = int(request.form["ölçek_üst_sınırı"])
+            except (ValueError, KeyError):
+                return render_template("anket_duzenle.html", anket=anket, hata="Geçersiz ölçek sınırı")
+
+            if ölçek_alt_sınırı >= ölçek_üst_sınırı:
+                return render_template("anket_duzenle.html", anket=anket, hata="Alt sınır üst sınırdan küçük olmalıdır")
+
+        soru = Soru(
+            metin=metin,
+            tip=tip,
+            zorunlu_mu=zorunlu_mu,
+            anket_kimlik=anket_kimlik,
+            sıra=len(anket.sorular) + 1,
+            ölçek_alt_sınırı=ölçek_alt_sınırı,
+            ölçek_üst_sınırı=ölçek_üst_sınırı
+        )
         db.session.add(soru)
         db.session.commit()
         return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
