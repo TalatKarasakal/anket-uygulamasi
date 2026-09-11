@@ -101,6 +101,8 @@ def soru_ekleme(anket_kimlik):
         abort(404)
     if anket.sahip_kimlik != kimlik:
         abort(403)
+    if anket.yayında_mı:
+        return render_template("anket_duzenle.html", anket=anket, hata="Yayındaki ankete soru eklenemez")
     if request.method == "POST":
         metin = request.form["metin"]
         tip = request.form["tip"]
@@ -143,6 +145,32 @@ def soru_ekleme(anket_kimlik):
         db.session.commit()
         return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
     return render_template("anket_duzenle.html", anket=anket)
+
+@uygulama.route("/anket/<int:anket_kimlik>/yayinla", methods=["POST"])
+def anket_yayınlama(anket_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    kimlik = session.get("kullanıcı_kimlik")
+    if anket is None:
+        abort(404)
+    if anket.sahip_kimlik != kimlik:
+        abort(403)
+    if not anket.sorular:
+        return render_template("anket_duzenle.html", anket=anket, hata="Boş anket yayınlanamaz")
+    anket.yayında_mı = True
+    db.session.commit()
+    return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
+
+@uygulama.route("/anket/<int:anket_kimlik>/yayindan-al", methods=["POST"])
+def anket_yayından_alma(anket_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    kimlik = session.get("kullanıcı_kimlik")
+    if anket is None:
+        abort(404)
+    if anket.sahip_kimlik != kimlik:
+        abort(403)
+    anket.yayında_mı = False
+    db.session.commit()
+    return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
 
 @uygulama.context_processor
 def oturum_bilgisi():

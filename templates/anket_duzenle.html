@@ -12,9 +12,23 @@
         <ul>{% for seçenek in soru.seçenekler %}<li>{{ seçenek.metin }}</li>{% endfor %}</ul>
         {% endif %}
     </li>
+    {% else %}
+    <li>Henüz soru eklenmemiş.</li>
     {% endfor %}
 </ul>
 
+{% if not anket.yayında_mı %}
+<form method="post" action="{{ url_for('anket_yayınlama', anket_kimlik=anket.kimlik) }}">
+    <button type="submit">Yayına al</button>
+</form>
+{% else %}
+<p>Bu anket yayında.</p>
+<form method="post" action="{{ url_for('anket_yayından_alma', anket_kimlik=anket.kimlik) }}">
+    <button type="submit">Yayından al</button>
+</form>
+{% endif %}
+
+{% if not anket.yayında_mı %}
 <h2>Soru Ekle</h2>
 <form method="post" action="{{ url_for('soru_ekleme', anket_kimlik=anket.kimlik) }}">
     <p><label>Soru metni <input type="text" name="metin" required></label></p>
@@ -34,9 +48,20 @@
     <button type="submit">Ekle</button>
 
     <p>Seçenekler</p>
-    <p><input type="text" name="seçenek"></p>
-    <p><input type="text" name="seçenek"></p>
+    <div id="secenek-kutulari">
+        <p><input type="text" name="seçenek"></p>
+        <p><input type="text" name="seçenek"></p>
+    </div>
+    <p><button type="button" id="secenek-ekle">Seçenek ekle</button></p>
 </form>
 
+<script>
+    document.getElementById("secenek-ekle").addEventListener("click", function () {
+        const kutu = document.createElement("p");
+        kutu.innerHTML = '<input type="text" name="seçenek">';
+        document.getElementById("secenek-kutulari").appendChild(kutu);
+    });
+</script>
+{% endif %}
 
 {% endblock %}
