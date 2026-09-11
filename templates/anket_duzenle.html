@@ -11,4 +11,23 @@
     <li>Henüz soru eklenmemiş.</li>
     {% endfor %}
 </ul>
+
+<h2>Soru Ekle</h2>
+<form method="post" action="{{ url_for('soru_ekleme', anket_kimlik=anket.kimlik) }}">
+    <p><label>Soru metni <input type="text" name="metin" required></label></p>
+    <p>
+        <label>Tip
+            <select name="tip">
+                <option value="açık uçlu">Açık uçlu</option>
+                <option value="evet/hayır">Evet / Hayır</option>
+                <option value="ölçek">Ölçek</option>
+                <option value="çoktan seçmeli">Çoktan seçmeli</option>
+            </select>
+        </label>
+    </p>
+    <p><label><input type="checkbox" name="zorunlu_mu"> Zorunlu</label></p>
+    <button type="submit">Ekle</button>
+</form>
+
+
 {% endblock %}

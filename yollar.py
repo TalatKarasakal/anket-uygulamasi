@@ -1,6 +1,6 @@
 from uygulama import uygulama
 from uzantılar import db
-from modeller import Kullanıcı, Anket
+from modeller import Kullanıcı, Anket, Soru
 from email_validator import validate_email, EmailNotValidError
 from flask import render_template, request, redirect, url_for, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -91,6 +91,26 @@ def anket_duzenle(anket_kimlik):
         abort(404)
     if anket.sahip_kimlik != kimlik:
         abort(403)
+    return render_template("anket_duzenle.html", anket=anket)
+
+@uygulama.route("/anket/<int:anket_kimlik>/soru/yeni", methods=["GET", "POST"])
+def soru_ekleme(anket_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    kimlik = session.get("kullanıcı_kimlik")
+    if anket is None:
+        abort(404)
+    if anket.sahip_kimlik != kimlik:
+        abort(403)
+    if request.method == "POST":
+        metin = request.form["metin"]
+        tip = request.form["tip"]
+        zorunlu_mu = "zorunlu_mu" in request.form
+        if not metin.strip():
+            return render_template("anket_duzenle.html", hata="Metin boş bırakılamaz")
+        soru = Soru(metin=metin, tip=tip, zorunlu_mu=zorunlu_mu, anket_kimlik=anket_kimlik, sıra=len(anket.sorular) + 1)
+        db.session.add(soru)
+        db.session.commit()
+        return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
     return render_template("anket_duzenle.html", anket=anket)
 
 @uygulama.context_processor
