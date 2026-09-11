@@ -1,0 +1,14 @@
+{% extends "taban.html" %}
+{% block başlık %}{{ anket.başlık }}{% endblock %}
+{% block içerik %}
+<h1>{{ anket.başlık }}</h1>
+{% if anket.açıklama %}<p>{{ anket.açıklama }}</p>{% endif %}
+<h2>Sorular</h2>
+<ul>
+    {% for soru in anket.sorular %}
+    <li>{{ soru.metin }} ({{ soru.tip }})</li>
+    {% else %}
+    <li>Henüz soru eklenmemiş.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

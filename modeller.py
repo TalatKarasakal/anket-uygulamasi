@@ -17,6 +17,7 @@ class Anket(db.Model):
     yayında_mı = db.Column(db.Boolean, nullable=False, default=False)
     oluşturma_zamanı = db.Column(db.DateTime, nullable=False, default=datetime.now)
     herkese_açık_mı = db.Column(db.Boolean, nullable=False, default=False)
+    sorular = db.relationship("Soru", back_populates="anket", cascade="all, delete-orphan", order_by="Soru.sıra")
 
 class Soru(db.Model):
     __tablename__ = "soru"
@@ -28,6 +29,7 @@ class Soru(db.Model):
     sıra = db.Column(db.Integer, nullable=False)
     ölçek_alt_sınırı = db.Column(db.Integer, nullable=True)
     ölçek_üst_sınırı = db.Column(db.Integer, nullable=True)
+    anket = db.relationship("Anket", back_populates="sorular")
 
 class Seçenek(db.Model):
     __tablename__ = "seçenek"

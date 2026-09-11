@@ -2,7 +2,7 @@ from uygulama import uygulama
 from uzantılar import db
 from modeller import Kullanıcı, Anket
 from email_validator import validate_email, EmailNotValidError
-from flask import render_template, request, redirect, url_for, session
+from flask import render_template, request, redirect, url_for, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 
 @uygulama.route("/")
@@ -82,6 +82,16 @@ def anket_oluşturma():
         db.session.commit()
         return redirect(url_for("ana_sayfa"))
     return render_template("anket_yeni.html")
+
+@uygulama.route("/anket/<int:anket_kimlik>/duzenle")
+def anket_duzenle(anket_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    kimlik = session.get("kullanıcı_kimlik")
+    if anket is None:
+        abort(404)
+    if anket.sahip_kimlik != kimlik:
+        abort(403)
+    return render_template("anket_duzenle.html", anket=anket)
 
 @uygulama.context_processor
 def oturum_bilgisi():

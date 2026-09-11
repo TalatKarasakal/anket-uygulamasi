@@ -9,7 +9,7 @@
 <h2>Anketlerim</h2>
 <ul>
     {% for anket in anketler %}
-    <li>{{ anket.başlık }}</li>
+    <li><a href="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">{{ anket.başlık }}</a></li>
     {% else %}
     <li>Henüz anketiniz yok.</li>
     {% endfor %}
