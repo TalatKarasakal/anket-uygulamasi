@@ -1,0 +1,29 @@
+{% extends "taban.html" %}
+{% block başlık %}{{ anket.başlık }}{% endblock %}
+{% block içerik %}
+<h1>{{ anket.başlık }}</h1>
+{% if anket.açıklama %}<p>{{ anket.açıklama }}</p>{% endif %}
+<form method="post">
+    {% for soru in anket.sorular %}
+    <p>
+        {{ soru.metin }}{% if soru.zorunlu_mu %} *{% endif %}<br>
+        {% if soru.tip == "açık uçlu" %}
+        <textarea name="soru_{{ soru.kimlik }}"></textarea>
+        {% elif soru.tip == "evet/hayır" %}
+        <label><input type="radio" name="soru_{{ soru.kimlik }}" value="evet"> Evet</label>
+        <label><input type="radio" name="soru_{{ soru.kimlik }}" value="hayır"> Hayır</label>
+        {% elif soru.tip == "ölçek" %}
+        <input type="number" name="soru_{{ soru.kimlik }}" min="{{ soru.ölçek_alt_sınırı }}"
+            max="{{ soru.ölçek_üst_sınırı }}">
+        ({{ soru.ölçek_alt_sınırı }}–{{ soru.ölçek_üst_sınırı }})
+        {% elif soru.tip == "çoktan seçmeli" %}
+        {% for seçenek in soru.seçenekler %}
+        <label><input type="radio" name="soru_{{ soru.kimlik }}" value="{{ seçenek.kimlik }}"> {{ seçenek.metin
+            }}</label>
+        {% endfor %}
+        {% endif %}
+    </p>
+    {% endfor %}
+    <button type="submit">Gönder</button>
+</form>
+{% endblock %}

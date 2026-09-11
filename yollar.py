@@ -1,6 +1,6 @@
 from uygulama import uygulama
 from uzantılar import db
-from modeller import Kullanıcı, Anket, Soru, Seçenek
+from modeller import Kullanıcı, Anket, Soru, Seçenek, Yanıt, Cevap
 from email_validator import validate_email, EmailNotValidError
 from flask import render_template, request, redirect, url_for, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -176,3 +176,86 @@ def anket_yayından_alma(anket_kimlik):
 def oturum_bilgisi():
     kimlik = session.get("kullanıcı_kimlik")
     return {"oturum_kullanıcısı": db.session.get(Kullanıcı, kimlik) if kimlik else None}
+
+@uygulama.route("/anketler")
+def anket_listesi():
+    kimlik = session.get("kullanıcı_kimlik")
+    if not kimlik:
+        return redirect(url_for("giriş_ekranı"))
+    anketler = db.session.execute(
+        db.select(Anket)
+        .where(Anket.yayında_mı.is_(True), Anket.herkese_açık_mı.is_(True))
+    ).scalars().all()
+    return render_template("anketler.html", anketler=anketler)
+
+@uygulama.route("/anket/<int:anket_kimlik>/yanitla", methods=["GET", "POST"])
+def anket_yanıtlama(anket_kimlik):
+    kimlik = session.get("kullanıcı_kimlik")
+    if not kimlik:
+        return redirect(url_for("giriş_ekranı"))
+
+    anket = db.session.get(Anket, anket_kimlik)
+    if anket is None:
+        abort(404)
+
+    if not anket.yayında_mı:
+        abort(403)
+
+    yanıt = db.session.execute(
+        db.select(Yanıt).where(
+            Yanıt.anket_kimlik == anket_kimlik,
+            Yanıt.yanıtlayan_kimlik == kimlik,
+        )
+    ).scalar_one_or_none()
+    if yanıt:
+        return redirect(url_for("anket_listesi"))
+
+    if request.method == "POST":
+        yanıt = Yanıt(anket_kimlik=anket_kimlik, yanıtlayan_kimlik=kimlik)
+
+        for soru in anket.sorular:
+            değer = request.form.get("soru_" + str(soru.kimlik))
+
+            if not değer or not değer.strip():
+                if soru.zorunlu_mu:
+                    db.session.rollback()
+                    return render_template("anket_yanitla.html", anket=anket, hata=f"'{soru.metin}' sorusu zorunludur")
+                continue
+
+            değer = değer.strip()
+            cevap = Cevap(soru_kimlik=soru.kimlik)
+
+            if soru.tip == "açık uçlu":
+                cevap.metin_değeri = değer
+            elif soru.tip == "evet/hayır":
+                cevap.evet_hayır_değeri = (değer == "evet")
+            elif soru.tip == "ölçek":
+                try:
+                    sayısal = int(değer)
+                except ValueError:
+                    db.session.rollback()
+                    return render_template("anket_yanitla.html", anket=anket, hata=f"'{soru.metin}' için geçerli bir sayı giriniz")
+                if (soru.ölçek_alt_sınırı is not None and sayısal < soru.ölçek_alt_sınırı) or \
+                   (soru.ölçek_üst_sınırı is not None and sayısal > soru.ölçek_üst_sınırı):
+                    db.session.rollback()
+                    return render_template("anket_yanitla.html", anket=anket, hata=f"'{soru.metin}' için değer {soru.ölçek_alt_sınırı} ile {soru.ölçek_üst_sınırı} arasında olmalıdır")
+                cevap.sayısal_değer = sayısal
+            elif soru.tip == "çoktan seçmeli":
+                try:
+                    seçilen_kimlik = int(değer)
+                except ValueError:
+                    db.session.rollback()
+                    return render_template("anket_yanitla.html", anket=anket, hata="Geçersiz seçenek")
+                if not any(seçenek.kimlik == seçilen_kimlik for seçenek in soru.seçenekler):
+                    db.session.rollback()
+                    return render_template("anket_yanitla.html", anket=anket, hata="Geçersiz seçenek")
+                cevap.seçilen_seçenek_kimlik = seçilen_kimlik
+
+            yanıt.cevaplar.append(cevap)
+
+        db.session.add(yanıt)
+        db.session.commit()
+        return redirect(url_for("anket_listesi"))
+
+    return render_template("anket_yanitla.html", anket=anket)
+

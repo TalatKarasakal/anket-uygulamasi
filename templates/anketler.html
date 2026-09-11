@@ -1,0 +1,12 @@
+{% extends "taban.html" %}
+{% block başlık %}Anketler{% endblock %}
+{% block içerik %}
+<h1>Yanıtlanabilir Anketler</h1>
+<ul>
+    {% for anket in anketler %}
+    <li><a href="{{ url_for('anket_yanıtlama', anket_kimlik=anket.kimlik) }}">{{ anket.başlık }}</a></li>
+    {% else %}
+    <li>Şu an yanıtlanabilir anket yok.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

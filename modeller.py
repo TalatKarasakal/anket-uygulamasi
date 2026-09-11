@@ -48,15 +48,17 @@ class Yanıt(db.Model):
     oluşturma_zamanı = db.Column(db.DateTime, nullable=False, default=datetime.now)
     değerlendirme_puanı = db.Column(db.Integer, nullable=True)
     __table_args__ = (db.UniqueConstraint("anket_kimlik", "yanıtlayan_kimlik"),)
+    cevaplar = db.relationship("Cevap", back_populates="yanıt", cascade="all, delete-orphan")
     
 class Cevap(db.Model):
     __tablename__ = "cevap"
     kimlik = db.Column(db.Integer, primary_key=True)
     yanıt_kimlik = db.Column(db.Integer, db.ForeignKey("yanıt.kimlik"), nullable=False)
     soru_kimlik = db.Column(db.Integer, db.ForeignKey("soru.kimlik"), nullable=False)
-    metin_değeri = db.Column(db.String(255), nullable=True)
+    metin_değeri = db.Column(db.Text, nullable=True)
     sayısal_değer = db.Column(db.Integer, nullable=True)
     evet_hayır_değeri = db.Column(db.Boolean, nullable=True)
     seçilen_seçenek_kimlik = db.Column(db.Integer, db.ForeignKey("seçenek.kimlik"), nullable=True)
     __table_args__ = (db.UniqueConstraint("yanıt_kimlik", "soru_kimlik"),)
+    yanıt = db.relationship("Yanıt", back_populates="cevaplar")
 
