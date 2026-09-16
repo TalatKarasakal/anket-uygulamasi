@@ -1,0 +1,39 @@
+{% extends "taban.html" %}
+{% block başlık %}{{ anket.başlık }} — Yanıtlar{% endblock %}
+{% block içerik %}
+  <h1>{{ anket.başlık }}</h1>
+  <p>Toplam {{ yanıtlar|length }} yanıt.</p>
+  {% for yanıt in yanıtlar %}
+    <h2>
+      {% if yanıtlayanlar.get(yanıt.kimlik) %}
+        {{ yanıtlayanlar[yanıt.kimlik] }}
+      {% else %}
+        Yanıtlayan {{ loop.index }}
+      {% endif %}
+      <small>{{ yanıt.oluşturma_zamanı.strftime("%d.%m.%Y %H:%M") }}</small>
+    </h2>
+    {% set cevaplar = {} %}
+    {% for cevap in yanıt.cevaplar %}{% if cevaplar.update({cevap.soru_kimlik: cevap}) %}{% endif %}{% endfor %}
+    <dl>
+      {% for soru in anket.sorular %}
+        <dt>{{ soru.metin }}</dt>
+        <dd>
+          {% set cevap = cevaplar.get(soru.kimlik) %}
+          {% if not cevap %}
+            <em>Yanıtlanmadı</em>
+          {% elif soru.tip == "açık uçlu" %}
+            {{ cevap.metin_değeri }}
+          {% elif soru.tip == "evet/hayır" %}
+            {{ "Evet" if cevap.evet_hayır_değeri else "Hayır" }}
+          {% elif soru.tip == "ölçek" %}
+            {{ cevap.sayısal_değer }}
+          {% elif soru.tip == "çoktan seçmeli" %}
+            {{ cevap.seçenek.metin if cevap.seçenek else "—" }}
+          {% endif %}
+        </dd>
+      {% endfor %}
+    </dl>
+  {% else %}
+    <p>Henüz yanıt yok.</p>
+  {% endfor %}
+{% endblock %}

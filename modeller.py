@@ -49,6 +49,8 @@ class Yanıt(db.Model):
     değerlendirme_puanı = db.Column(db.Integer, nullable=True)
     __table_args__ = (db.UniqueConstraint("anket_kimlik", "yanıtlayan_kimlik"),)
     cevaplar = db.relationship("Cevap", back_populates="yanıt", cascade="all, delete-orphan")
+    yanıtlayan = db.relationship("Kullanıcı")
+
     
 class Cevap(db.Model):
     __tablename__ = "cevap"

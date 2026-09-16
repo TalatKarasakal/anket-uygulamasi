@@ -28,6 +28,9 @@
 </form>
 {% endif %}
 
+<p><a href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik) }}">Yanıtları gör</a></p>
+
+
 {% if not anket.yayında_mı %}
 <h2>Soru Ekle</h2>
 <form method="post" action="{{ url_for('soru_ekleme', anket_kimlik=anket.kimlik) }}">

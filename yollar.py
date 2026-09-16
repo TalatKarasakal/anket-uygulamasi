@@ -281,3 +281,22 @@ def yanıt_sayfası(anket_kimlik):
     cevaplar = {c.soru_kimlik: c for c in yanıt.cevaplar}
     return render_template("anket_yanitim.html", anket=anket, yanıt=yanıt, cevaplar=cevaplar)
 
+@uygulama.route("/anket/<int:anket_kimlik>/yanitlar")
+def anket_yanıtları(anket_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    kimlik = session.get("kullanıcı_kimlik")
+    if anket is None:
+        abort(404)
+    if anket.sahip_kimlik != kimlik:
+        abort(403)
+
+    yanıtlar = db.session.execute(
+        db.select(Yanıt).where(Yanıt.anket_kimlik == anket_kimlik).order_by(Yanıt.oluşturma_zamanı)
+    ).scalars().all()
+
+    if not anket.anonim_mi:
+        yanıtlayanlar = {y.kimlik: y.yanıtlayan.e_posta for y in yanıtlar if y.yanıtlayan}
+    else:
+        yanıtlayanlar = {}
+
+    return render_template("anket_yanitlar.html", anket=anket, yanıtlar=yanıtlar, yanıtlayanlar=yanıtlayanlar)
