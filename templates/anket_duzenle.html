@@ -29,6 +29,10 @@
 {% endif %}
 
 <p><a href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik) }}">Yanıtları gör</a></p>
+<p><a href="{{ url_for('anket_özeti', anket_kimlik=anket.kimlik) }}">Özeti gör</a></p>
+<p><a href="{{ url_for('anket_ayarları', anket_kimlik=anket.kimlik) }}">Ayarları düzenle</a></p>
+
+
 
 
 {% if not anket.yayında_mı %}

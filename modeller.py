@@ -17,7 +17,14 @@ class Anket(db.Model):
     yayında_mı = db.Column(db.Boolean, nullable=False, default=False)
     oluşturma_zamanı = db.Column(db.DateTime, nullable=False, default=datetime.now)
     herkese_açık_mı = db.Column(db.Boolean, nullable=False, default=False)
+    açık_uçlu_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
+    evet_hayır_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
+    ölçek_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
+    çoktan_seçmeli_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
     sorular = db.relationship("Soru", back_populates="anket", cascade="all, delete-orphan", order_by="Soru.sıra")
+
+    yanıtlar = db.relationship("Yanıt", back_populates="anket", cascade="all, delete-orphan")
+
 
 class Soru(db.Model):
     __tablename__ = "soru"
@@ -50,6 +57,8 @@ class Yanıt(db.Model):
     __table_args__ = (db.UniqueConstraint("anket_kimlik", "yanıtlayan_kimlik"),)
     cevaplar = db.relationship("Cevap", back_populates="yanıt", cascade="all, delete-orphan")
     yanıtlayan = db.relationship("Kullanıcı")
+    anket = db.relationship("Anket", back_populates="yanıtlar")
+
 
     
 class Cevap(db.Model):

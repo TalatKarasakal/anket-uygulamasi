@@ -1,0 +1,50 @@
+{% extends "taban.html" %}
+{% block başlık %}{{ anket.başlık }} — Özet{% endblock %}
+{% block içerik %}
+  <h1>{{ anket.başlık }} — Özet</h1>
+  <p>Toplam {{ toplam_yanıt }} yanıt. Yüzdeler toplam yanıt sayısı üzerinden hesaplanmıştır;
+     soruyu boş bırakanlar da paydaya dâhildir.</p>
+
+  {% for soru in anket.sorular %}
+    {% set özet = özetler.get(soru.kimlik) %}
+    <h2>{{ soru.metin }}</h2>
+    {% if not özet %}
+      <p><em>Özet yok.</em></p>
+    {% else %}
+      <p>{{ özet.cevap_sayısı }} yanıtlandı, {{ özet.boş_sayısı }} boş.</p>
+
+      {% if soru.tip == "açık uçlu" %}
+        <ul>
+          {% for metin in özet.metinler %}<li>{{ metin }}</li>
+          {% else %}<li><em>Cevap yok.</em></li>{% endfor %}
+        </ul>
+
+      {% elif soru.tip == "evet/hayır" %}
+        <ul>
+          <li>Evet: {{ özet.evet_sayısı }} (%{{ özet.evet_yüzde }})</li>
+          <li>Hayır: {{ özet.hayır_sayısı }} (%{{ özet.hayır_yüzde }})</li>
+        </ul>
+
+      {% elif soru.tip == "ölçek" %}
+        <p>Ortalama:
+          {% if özet.ortalama is none %}<em>ölçülmedi</em>{% else %}{{ özet.ortalama }}{% endif %}
+          ({{ soru.ölçek_alt_sınırı }}–{{ soru.ölçek_üst_sınırı }} arası)
+        </p>
+        <table>
+          <tr><th>Değer</th><th>Adet</th><th>Yüzde</th></tr>
+          {% for satır in özet.dağılım %}
+            <tr><td>{{ satır.değer }}</td><td>{{ satır.adet }}</td><td>%{{ satır.yüzde }}</td></tr>
+          {% endfor %}
+        </table>
+
+      {% elif soru.tip == "çoktan seçmeli" %}
+        <table>
+          <tr><th>Seçenek</th><th>Adet</th><th>Yüzde</th></tr>
+          {% for satır in özet.dağılım %}
+            <tr><td>{{ satır.seçenek.metin }}</td><td>{{ satır.adet }}</td><td>%{{ satır.yüzde }}</td></tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+{% endblock %}

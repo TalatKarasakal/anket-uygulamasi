@@ -5,6 +5,13 @@ from email_validator import validate_email, EmailNotValidError
 from flask import render_template, request, redirect, url_for, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 
+TİP_İZİN_ALANI = {
+    "açık uçlu": "açık_uçlu_izinli_mi",
+    "evet/hayır": "evet_hayır_izinli_mi",
+    "ölçek": "ölçek_izinli_mi",
+    "çoktan seçmeli": "çoktan_seçmeli_izinli_mi",
+}
+
 @uygulama.route("/")
 def ana_sayfa():
     kimlik = session.get("kullanıcı_kimlik")
@@ -93,6 +100,46 @@ def anket_duzenle(anket_kimlik):
         abort(403)
     return render_template("anket_duzenle.html", anket=anket)
 
+@uygulama.route("/anket/<int:anket_kimlik>/ayarlar", methods=["GET", "POST"])
+def anket_ayarları(anket_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    kimlik = session.get("kullanıcı_kimlik")
+    if anket is None:
+        abort(404)
+    if anket.sahip_kimlik != kimlik:
+        abort(403)
+
+    if request.method == "POST":
+        başlık = request.form["başlık"].strip()
+        açıklama = request.form.get("açıklama", "")
+        anonim_mi = "anonim_mi" in request.form
+        herkese_açık_mı = "herkese_açık_mı" in request.form
+
+        if not başlık:
+            return render_template("anket_ayarlar.html", anket=anket, hata="Başlık boş bırakılamaz")
+
+        if anonim_mi != anket.anonim_mi:
+            yanıt_var = db.session.execute(
+                db.select(db.func.count()).select_from(Yanıt).where(Yanıt.anket_kimlik == anket_kimlik)
+            ).scalar() > 0
+            if yanıt_var:
+                return render_template("anket_ayarlar.html", anket=anket, hata="Yanıt almış bir anketin anonimlik ayarı değiştirilemez")
+            anket.anonim_mi = anonim_mi
+
+        anket.başlık = başlık
+        anket.açıklama = açıklama
+        anket.herkese_açık_mı = herkese_açık_mı
+        anket.açık_uçlu_izinli_mi = "açık_uçlu_izinli_mi" in request.form
+        anket.evet_hayır_izinli_mi = "evet_hayır_izinli_mi" in request.form
+        anket.ölçek_izinli_mi = "ölçek_izinli_mi" in request.form
+        anket.çoktan_seçmeli_izinli_mi = "çoktan_seçmeli_izinli_mi" in request.form
+        db.session.commit()
+
+        return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
+
+    return render_template("anket_ayarlar.html", anket=anket)
+
+
 @uygulama.route("/anket/<int:anket_kimlik>/soru/yeni", methods=["GET", "POST"])
 def soru_ekleme(anket_kimlik):
     anket = db.session.get(Anket, anket_kimlik)
@@ -106,7 +153,13 @@ def soru_ekleme(anket_kimlik):
     if request.method == "POST":
         metin = request.form["metin"]
         tip = request.form["tip"]
+        if tip not in TİP_İZİN_ALANI:
+            return render_template("anket_duzenle.html", anket=anket, hata="Geçersiz soru tipi")
+        if not getattr(anket, TİP_İZİN_ALANI[tip]):
+            return render_template("anket_duzenle.html", anket=anket, hata="Bu soru tipine izin verilmiyor")
         zorunlu_mu = "zorunlu_mu" in request.form
+
+
         if not metin.strip():
             return render_template("anket_duzenle.html", anket=anket, hata="Metin boş bırakılamaz")
 
@@ -146,6 +199,30 @@ def soru_ekleme(anket_kimlik):
         return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
     return render_template("anket_duzenle.html", anket=anket)
 
+@uygulama.route("/anket/<int:anket_kimlik>/soru/<int:soru_kimlik>/sil", methods=["POST"])
+def soru_silme(anket_kimlik, soru_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    kimlik = session.get("kullanıcı_kimlik")
+    if anket is None:
+        abort(404)
+    if anket.sahip_kimlik != kimlik:
+        abort(403)
+    if anket.yayında_mı:
+        return render_template("anket_duzenle.html", anket=anket, hata="Yayındaki anketin soruları silinemez")
+
+    soru = db.session.get(Soru, soru_kimlik)
+    if soru is None or soru.anket_kimlik != anket_kimlik:
+        abort(404)
+
+    db.session.delete(soru)
+    kalan_sorular = [s for s in anket.sorular if s.kimlik != soru.kimlik]
+    for yeni_sıra, s in enumerate(sorted(kalan_sorular, key=lambda x: x.sıra), start=1):
+        s.sıra = yeni_sıra
+
+    db.session.commit()
+    return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
+
+
 @uygulama.route("/anket/<int:anket_kimlik>/yayinla", methods=["POST"])
 def anket_yayınlama(anket_kimlik):
     anket = db.session.get(Anket, anket_kimlik)
@@ -156,8 +233,13 @@ def anket_yayınlama(anket_kimlik):
         abort(403)
     if not anket.sorular:
         return render_template("anket_duzenle.html", anket=anket, hata="Boş anket yayınlanamaz")
+    for soru in anket.sorular:
+        alan = TİP_İZİN_ALANI.get(soru.tip)
+        if alan and not getattr(anket, alan):
+            return render_template("anket_duzenle.html", anket=anket, hata=f"İzinsiz tipte soru ({soru.tip}) içerdiği için anket yayınlanamaz")
     anket.yayında_mı = True
     db.session.commit()
+
     return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
 
 @uygulama.route("/anket/<int:anket_kimlik>/yayindan-al", methods=["POST"])
@@ -171,6 +253,20 @@ def anket_yayından_alma(anket_kimlik):
     anket.yayında_mı = False
     db.session.commit()
     return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
+
+@uygulama.route("/anket/<int:anket_kimlik>/sil", methods=["POST"])
+def anket_silme(anket_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    kimlik = session.get("kullanıcı_kimlik")
+    if anket is None:
+        abort(404)
+    if anket.sahip_kimlik != kimlik:
+        abort(403)
+
+    db.session.delete(anket)
+    db.session.commit()
+    return redirect(url_for("ana_sayfa"))
+
 
 @uygulama.context_processor
 def oturum_bilgisi():
@@ -300,3 +396,71 @@ def anket_yanıtları(anket_kimlik):
         yanıtlayanlar = {}
 
     return render_template("anket_yanitlar.html", anket=anket, yanıtlar=yanıtlar, yanıtlayanlar=yanıtlayanlar)
+
+@uygulama.route("/anket/<int:anket_kimlik>/ozet")
+def anket_özeti(anket_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    kimlik = session.get("kullanıcı_kimlik")
+    if anket is None:
+        abort(404)
+    if anket.sahip_kimlik != kimlik:
+        abort(403)
+
+    yanıtlar = db.session.execute(
+        db.select(Yanıt).where(Yanıt.anket_kimlik == anket_kimlik)
+    ).scalars().all()
+    toplam_yanıt = len(yanıtlar)
+
+    özetler = {}
+    for soru in anket.sorular:
+        cevaplar = [c for y in yanıtlar for c in y.cevaplar if c.soru_kimlik == soru.kimlik]
+
+        if soru.tip == "açık uçlu":
+            metinler = [c.metin_değeri for c in cevaplar if c.metin_değeri and c.metin_değeri.strip()]
+            özetler[soru.kimlik] = {
+                "cevap_sayısı": len(metinler),
+                "boş_sayısı": toplam_yanıt - len(metinler),
+                "metinler": metinler,
+            }
+        elif soru.tip == "evet/hayır":
+            evet_sayısı = sum(1 for c in cevaplar if c.evet_hayır_değeri is True)
+            hayır_sayısı = sum(1 for c in cevaplar if c.evet_hayır_değeri is False)
+            cevap_sayısı = evet_sayısı + hayır_sayısı
+            özetler[soru.kimlik] = {
+                "cevap_sayısı": cevap_sayısı,
+                "boş_sayısı": toplam_yanıt - cevap_sayısı,
+                "evet_sayısı": evet_sayısı,
+                "hayır_sayısı": hayır_sayısı,
+                "evet_yüzde": round((evet_sayısı / toplam_yanıt) * 100, 1) if toplam_yanıt > 0 else 0,
+                "hayır_yüzde": round((hayır_sayısı / toplam_yanıt) * 100, 1) if toplam_yanıt > 0 else 0,
+            }
+        elif soru.tip == "ölçek":
+            değerler = [c.sayısal_değer for c in cevaplar if c.sayısal_değer is not None]
+            ortalama = round(sum(değerler) / len(değerler), 2) if değerler else None
+            alt = soru.ölçek_alt_sınırı if soru.ölçek_alt_sınırı is not None else (min(değerler) if değerler else 1)
+            ust = soru.ölçek_üst_sınırı if soru.ölçek_üst_sınırı is not None else (max(değerler) if değerler else 10)
+            dağılım = []
+            for val in range(alt, ust + 1):
+                adet = değerler.count(val)
+                yüzde = round((adet / toplam_yanıt) * 100, 1) if toplam_yanıt > 0 else 0
+                dağılım.append({"değer": val, "adet": adet, "yüzde": yüzde})
+            özetler[soru.kimlik] = {
+                "cevap_sayısı": len(değerler),
+                "boş_sayısı": toplam_yanıt - len(değerler),
+                "ortalama": ortalama,
+                "dağılım": dağılım,
+            }
+        elif soru.tip == "çoktan seçmeli":
+            seçilenler = [c.seçilen_seçenek_kimlik for c in cevaplar if c.seçilen_seçenek_kimlik is not None]
+            dağılım = []
+            for sec in soru.seçenekler:
+                adet = seçilenler.count(sec.kimlik)
+                yüzde = round((adet / toplam_yanıt) * 100, 1) if toplam_yanıt > 0 else 0
+                dağılım.append({"seçenek": sec, "adet": adet, "yüzde": yüzde})
+            özetler[soru.kimlik] = {
+                "cevap_sayısı": len(seçilenler),
+                "boş_sayısı": toplam_yanıt - len(seçilenler),
+                "dağılım": dağılım,
+            }
+
+    return render_template("anket_ozet.html", anket=anket, toplam_yanıt=toplam_yanıt, özetler=özetler)
