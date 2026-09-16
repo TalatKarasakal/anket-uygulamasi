@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from uygulama import uygulama
 from uzantılar import db
-from modeller import Kullanıcı, Anket, Soru, Seçenek, Yanıt, Cevap
+from modeller import Kullanıcı, Anket, Soru, Seçenek, Yanıt, Cevap, AnketYetki
 from email_validator import validate_email, EmailNotValidError
 from flask import render_template, request, redirect, url_for, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -13,15 +13,70 @@ TİP_İZİN_ALANI = {
     "çoktan seçmeli": "çoktan_seçmeli_izinli_mi",
 }
 
+def yetkiyi_getir(anket, kimlik):
+    if not anket or not kimlik:
+        return None
+    return db.session.execute(
+        db.select(AnketYetki).where(
+            AnketYetki.anket_kimlik == anket.kimlik,
+            AnketYetki.kullanıcı_kimlik == kimlik,
+        )
+    ).scalar_one_or_none()
+
+def anketi_getir(anket_kimlik, izin=None):
+    anket = db.session.get(Anket, anket_kimlik)
+    if anket is None:
+        abort(404)
+    kimlik = session.get("kullanıcı_kimlik")
+    if not kimlik:
+        abort(403)
+    if anket.sahip_kimlik == kimlik:
+        return anket
+
+    if izin == "sahip":
+        abort(403)
+
+    yetki = yetkiyi_getir(anket, kimlik)
+
+    if not yetki:
+        abort(403)
+
+    if yetki.yöneticilik_mi:
+        return anket
+
+    if izin is None:
+        return anket
+
+    if isinstance(izin, (list, tuple, set)):
+        if any(getattr(yetki, i, False) for i in izin):
+            return anket
+    elif getattr(yetki, izin, False):
+        return anket
+
+    abort(403)
+
+def anket_duzenle_goster(anket, hata=None):
+    kimlik = session.get("kullanıcı_kimlik")
+    sahip_mi = (anket.sahip_kimlik == kimlik)
+    yetki = yetkiyi_getir(anket, kimlik)
+    yönetici_mi = sahip_mi or (yetki and yetki.yöneticilik_mi)
+    üye_mi = (yetki is not None)
+    return render_template("anket_duzenle.html", anket=anket, hata=hata, yönetici_mi=yönetici_mi, üye_mi=üye_mi)
+
 @uygulama.route("/")
 def ana_sayfa():
     kimlik = session.get("kullanıcı_kimlik")
     anketler = []
+    üye_olunan_anketler = []
     if kimlik:
         anketler = db.session.execute(
             db.select(Anket).where(Anket.sahip_kimlik == kimlik)
         ).scalars().all()
-    return render_template("ana_sayfa.html", anketler=anketler)
+        üye_olunan_anketler = db.session.execute(
+            db.select(Anket).join(AnketYetki, AnketYetki.anket_kimlik == Anket.kimlik)
+            .where(AnketYetki.kullanıcı_kimlik == kimlik)
+        ).scalars().all()
+    return render_template("ana_sayfa.html", anketler=anketler, üye_olunan_anketler=üye_olunan_anketler)
 
 @uygulama.route("/kayit", methods=["GET", "POST"])
 def kayıt_ekranı():
@@ -93,104 +148,116 @@ def anket_oluşturma():
 
 @uygulama.route("/anket/<int:anket_kimlik>/duzenle")
 def anket_duzenle(anket_kimlik):
-    anket = db.session.get(Anket, anket_kimlik)
-    kimlik = session.get("kullanıcı_kimlik")
-    if anket is None:
-        abort(404)
-    if anket.sahip_kimlik != kimlik:
-        abort(403)
-    return render_template("anket_duzenle.html", anket=anket)
+    anket = anketi_getir(anket_kimlik)
+    return anket_duzenle_goster(anket)
 
 @uygulama.route("/anket/<int:anket_kimlik>/ayarlar", methods=["GET", "POST"])
 def anket_ayarları(anket_kimlik):
-    anket = db.session.get(Anket, anket_kimlik)
+    anket = anketi_getir(anket_kimlik, ("içerik_düzenleme_mi", "yayın_yönetimi_mi"))
     kimlik = session.get("kullanıcı_kimlik")
-    if anket is None:
-        abort(404)
-    if anket.sahip_kimlik != kimlik:
-        abort(403)
+    sahip_mi = (anket.sahip_kimlik == kimlik)
+    yetki = yetkiyi_getir(anket, kimlik)
+
+    içerik_yetkisi = sahip_mi or (yetki and (yetki.yöneticilik_mi or yetki.içerik_düzenleme_mi))
+    yayın_yetkisi = sahip_mi or (yetki and (yetki.yöneticilik_mi or yetki.yayın_yönetimi_mi))
 
     if request.method == "POST":
-        başlık = request.form["başlık"].strip()
-        açıklama = request.form.get("açıklama", "")
-        anonim_mi = "anonim_mi" in request.form
-        herkese_açık_mı = "herkese_açık_mı" in request.form
+        if not yayın_yetkisi and any(k in request.form for k in ("herkese_açık_mı", "anonim_mi", "süre_tipi", "son_tarih", "süre_gün")):
+            return render_template(
+                "anket_ayarlar.html",
+                anket=anket,
+                hata="Erişim politikası ve süre ayarlarını değiştirme yetkiniz yoktur",
+                içerik_yetkisi=içerik_yetkisi,
+                yayın_yetkisi=yayın_yetkisi,
+            )
 
-        if not başlık:
-            return render_template("anket_ayarlar.html", anket=anket, hata="Başlık boş bırakılamaz")
+        if not içerik_yetkisi and any(k in request.form for k in ("başlık", "açıklama", "açık_uçlu_izinli_mi", "evet_hayır_izinli_mi", "ölçek_izinli_mi", "çoktan_seçmeli_izinli_mi")):
+            return render_template(
+                "anket_ayarlar.html",
+                anket=anket,
+                hata="İçerik ayarlarını değiştirme yetkiniz yoktur",
+                içerik_yetkisi=içerik_yetkisi,
+                yayın_yetkisi=yayın_yetkisi,
+            )
 
-        if anonim_mi != anket.anonim_mi:
-            yanıt_var = db.session.execute(
-                db.select(db.func.count()).select_from(Yanıt).where(Yanıt.anket_kimlik == anket_kimlik)
-            ).scalar() > 0
-            if yanıt_var:
-                return render_template("anket_ayarlar.html", anket=anket, hata="Yanıt almış bir anketin anonimlik ayarı değiştirilemez")
-            anket.anonim_mi = anonim_mi
+        if içerik_yetkisi:
+            başlık = request.form.get("başlık", "").strip()
+            if not başlık:
+                return render_template("anket_ayarlar.html", anket=anket, hata="Başlık boş bırakılamaz",
+                                       içerik_yetkisi=içerik_yetkisi, yayın_yetkisi=yayın_yetkisi)
+            anket.başlık = başlık
+            anket.açıklama = request.form.get("açıklama", "")
+            anket.açık_uçlu_izinli_mi = "açık_uçlu_izinli_mi" in request.form
+            anket.evet_hayır_izinli_mi = "evet_hayır_izinli_mi" in request.form
+            anket.ölçek_izinli_mi = "ölçek_izinli_mi" in request.form
+            anket.çoktan_seçmeli_izinli_mi = "çoktan_seçmeli_izinli_mi" in request.form
 
-        süre_tipi = request.form.get("süre_tipi", "süre_yok")
+        if yayın_yetkisi:
+            anonim_mi = "anonim_mi" in request.form
+            if anonim_mi != anket.anonim_mi:
+                yanıt_var = db.session.execute(
+                    db.select(db.func.count()).select_from(Yanıt).where(Yanıt.anket_kimlik == anket_kimlik)
+                ).scalar() > 0
+                if yanıt_var:
+                    return render_template("anket_ayarlar.html", anket=anket, hata="Yanıt almış bir anketin anonimlik ayarı değiştirilemez",
+                                           içerik_yetkisi=içerik_yetkisi, yayın_yetkisi=yayın_yetkisi)
+                anket.anonim_mi = anonim_mi
 
-        if süre_tipi == "son_tarih":
-            son_tarih_metni = request.form.get("son_tarih", "").strip()
-            if not son_tarih_metni:
-                return render_template("anket_ayarlar.html", anket=anket, hata="Son tarih belirtilmelidir")
-            try:
-                yeni_son_tarih = datetime.fromisoformat(son_tarih_metni)
-            except ValueError:
-                return render_template("anket_ayarlar.html", anket=anket, hata="Geçersiz tarih formatı")
-            if yeni_son_tarih <= datetime.now():
-                return render_template("anket_ayarlar.html", anket=anket, hata="Son tarih gelecekte bir zaman olmalıdır")
-            anket.son_tarih = yeni_son_tarih
-            anket.süre_gün = None
-        elif süre_tipi == "süre_gün":
-            süre_gün_metni = request.form.get("süre_gün", "").strip()
-            try:
-                yeni_süre_gün = int(süre_gün_metni)
-                if yeni_süre_gün <= 0:
-                    raise ValueError()
-            except (ValueError, TypeError):
-                return render_template("anket_ayarlar.html", anket=anket, hata="Süre pozitif bir gün sayısı olmalıdır")
-            anket.süre_gün = yeni_süre_gün
-            # süre_gün seçiliyse son_tarih'e dokunulmaz (yayına alma hesaplayacak)
-        else:
-            anket.son_tarih = None
-            anket.süre_gün = None
+            anket.herkese_açık_mı = "herkese_açık_mı" in request.form
 
-        anket.başlık = başlık
-        anket.açıklama = açıklama
-        anket.herkese_açık_mı = herkese_açık_mı
-        anket.açık_uçlu_izinli_mi = "açık_uçlu_izinli_mi" in request.form
-        anket.evet_hayır_izinli_mi = "evet_hayır_izinli_mi" in request.form
-        anket.ölçek_izinli_mi = "ölçek_izinli_mi" in request.form
-        anket.çoktan_seçmeli_izinli_mi = "çoktan_seçmeli_izinli_mi" in request.form
+            süre_tipi = request.form.get("süre_tipi", "süre_yok")
+            if süre_tipi == "son_tarih":
+                son_tarih_metni = request.form.get("son_tarih", "").strip()
+                if not son_tarih_metni:
+                    return render_template("anket_ayarlar.html", anket=anket, hata="Son tarih belirtilmelidir",
+                                           içerik_yetkisi=içerik_yetkisi, yayın_yetkisi=yayın_yetkisi)
+                try:
+                    yeni_son_tarih = datetime.fromisoformat(son_tarih_metni)
+                except ValueError:
+                    return render_template("anket_ayarlar.html", anket=anket, hata="Geçersiz tarih formatı",
+                                           içerik_yetkisi=içerik_yetkisi, yayın_yetkisi=yayın_yetkisi)
+                if yeni_son_tarih <= datetime.now():
+                    return render_template("anket_ayarlar.html", anket=anket, hata="Son tarih gelecekte bir zaman olmalıdır",
+                                           içerik_yetkisi=içerik_yetkisi, yayın_yetkisi=yayın_yetkisi)
+                anket.son_tarih = yeni_son_tarih
+                anket.süre_gün = None
+            elif süre_tipi == "süre_gün":
+                süre_gün_metni = request.form.get("süre_gün", "").strip()
+                try:
+                    yeni_süre_gün = int(süre_gün_metni)
+                    if yeni_süre_gün <= 0:
+                        raise ValueError()
+                except (ValueError, TypeError):
+                    return render_template("anket_ayarlar.html", anket=anket, hata="Süre pozitif bir gün sayısı olmalıdır",
+                                           içerik_yetkisi=içerik_yetkisi, yayın_yetkisi=yayın_yetkisi)
+                anket.süre_gün = yeni_süre_gün
+            else:
+                anket.son_tarih = None
+                anket.süre_gün = None
+
         db.session.commit()
-
         return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
 
-    return render_template("anket_ayarlar.html", anket=anket)
+    return render_template("anket_ayarlar.html", anket=anket,
+                           içerik_yetkisi=içerik_yetkisi, yayın_yetkisi=yayın_yetkisi)
 
 
 @uygulama.route("/anket/<int:anket_kimlik>/soru/yeni", methods=["GET", "POST"])
 def soru_ekleme(anket_kimlik):
-    anket = db.session.get(Anket, anket_kimlik)
-    kimlik = session.get("kullanıcı_kimlik")
-    if anket is None:
-        abort(404)
-    if anket.sahip_kimlik != kimlik:
-        abort(403)
+    anket = anketi_getir(anket_kimlik, "içerik_düzenleme_mi")
     if anket.yayında_mı:
-        return render_template("anket_duzenle.html", anket=anket, hata="Yayındaki ankete soru eklenemez")
+        return anket_duzenle_goster(anket, hata="Yayındaki ankete soru eklenemez")
     if request.method == "POST":
         metin = request.form["metin"]
         tip = request.form["tip"]
         if tip not in TİP_İZİN_ALANI:
-            return render_template("anket_duzenle.html", anket=anket, hata="Geçersiz soru tipi")
+            return anket_duzenle_goster(anket, hata="Geçersiz soru tipi")
         if not getattr(anket, TİP_İZİN_ALANI[tip]):
-            return render_template("anket_duzenle.html", anket=anket, hata="Bu soru tipine izin verilmiyor")
+            return anket_duzenle_goster(anket, hata="Bu soru tipine izin verilmiyor")
         zorunlu_mu = "zorunlu_mu" in request.form
 
-
         if not metin.strip():
-            return render_template("anket_duzenle.html", anket=anket, hata="Metin boş bırakılamaz")
+            return anket_duzenle_goster(anket, hata="Metin boş bırakılamaz")
 
         ölçek_alt_sınırı = None
         ölçek_üst_sınırı = None
@@ -199,16 +266,16 @@ def soru_ekleme(anket_kimlik):
                 ölçek_alt_sınırı = int(request.form["ölçek_alt_sınırı"])
                 ölçek_üst_sınırı = int(request.form["ölçek_üst_sınırı"])
             except (ValueError, KeyError):
-                return render_template("anket_duzenle.html", anket=anket, hata="Geçersiz ölçek sınırı")
+                return anket_duzenle_goster(anket, hata="Geçersiz ölçek sınırı")
 
             if ölçek_alt_sınırı >= ölçek_üst_sınırı:
-                return render_template("anket_duzenle.html", anket=anket, hata="Alt sınır üst sınırdan küçük olmalıdır")
+                return anket_duzenle_goster(anket, hata="Alt sınır üst sınırdan küçük olmalıdır")
 
         seçenekler = []
         if tip == "çoktan seçmeli":
             seçenekler = [s.strip() for s in request.form.getlist("seçenek") if s.strip()]
             if len(seçenekler) < 2:
-                return render_template("anket_duzenle.html", anket=anket, hata="Seçenek en az 2 olmalıdır")
+                return anket_duzenle_goster(anket, hata="Seçenek en az 2 olmalıdır")
 
         soru = Soru(
             metin=metin,
@@ -226,18 +293,13 @@ def soru_ekleme(anket_kimlik):
         db.session.add(soru)
         db.session.commit()
         return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
-    return render_template("anket_duzenle.html", anket=anket)
+    return anket_duzenle_goster(anket)
 
 @uygulama.route("/anket/<int:anket_kimlik>/soru/<int:soru_kimlik>/sil", methods=["POST"])
 def soru_silme(anket_kimlik, soru_kimlik):
-    anket = db.session.get(Anket, anket_kimlik)
-    kimlik = session.get("kullanıcı_kimlik")
-    if anket is None:
-        abort(404)
-    if anket.sahip_kimlik != kimlik:
-        abort(403)
+    anket = anketi_getir(anket_kimlik, "içerik_düzenleme_mi")
     if anket.yayında_mı:
-        return render_template("anket_duzenle.html", anket=anket, hata="Yayındaki anketin soruları silinemez")
+        return anket_duzenle_goster(anket, hata="Yayındaki anketin soruları silinemez")
 
     soru = db.session.get(Soru, soru_kimlik)
     if soru is None or soru.anket_kimlik != anket_kimlik:
@@ -254,18 +316,13 @@ def soru_silme(anket_kimlik, soru_kimlik):
 
 @uygulama.route("/anket/<int:anket_kimlik>/yayinla", methods=["POST"])
 def anket_yayınlama(anket_kimlik):
-    anket = db.session.get(Anket, anket_kimlik)
-    kimlik = session.get("kullanıcı_kimlik")
-    if anket is None:
-        abort(404)
-    if anket.sahip_kimlik != kimlik:
-        abort(403)
+    anket = anketi_getir(anket_kimlik, "yayın_yönetimi_mi")
     if not anket.sorular:
-        return render_template("anket_duzenle.html", anket=anket, hata="Boş anket yayınlanamaz")
+        return anket_duzenle_goster(anket, hata="Boş anket yayınlanamaz")
     for soru in anket.sorular:
         alan = TİP_İZİN_ALANI.get(soru.tip)
         if alan and not getattr(anket, alan):
-            return render_template("anket_duzenle.html", anket=anket, hata=f"İzinsiz tipte soru ({soru.tip}) içerdiği için anket yayınlanamaz")
+            return anket_duzenle_goster(anket, hata=f"İzinsiz tipte soru ({soru.tip}) içerdiği için anket yayınlanamaz")
     if anket.süre_gün:
         anket.son_tarih = datetime.now() + timedelta(days=anket.süre_gün)
     anket.yayında_mı = True
@@ -275,28 +332,110 @@ def anket_yayınlama(anket_kimlik):
 
 @uygulama.route("/anket/<int:anket_kimlik>/yayindan-al", methods=["POST"])
 def anket_yayından_alma(anket_kimlik):
-    anket = db.session.get(Anket, anket_kimlik)
-    kimlik = session.get("kullanıcı_kimlik")
-    if anket is None:
-        abort(404)
-    if anket.sahip_kimlik != kimlik:
-        abort(403)
+    anket = anketi_getir(anket_kimlik, "yayın_yönetimi_mi")
     anket.yayında_mı = False
     db.session.commit()
     return redirect(url_for("anket_duzenle", anket_kimlik=anket_kimlik))
 
 @uygulama.route("/anket/<int:anket_kimlik>/sil", methods=["POST"])
 def anket_silme(anket_kimlik):
-    anket = db.session.get(Anket, anket_kimlik)
-    kimlik = session.get("kullanıcı_kimlik")
-    if anket is None:
-        abort(404)
-    if anket.sahip_kimlik != kimlik:
-        abort(403)
+    anket = anketi_getir(anket_kimlik, "sahip")
 
     db.session.delete(anket)
     db.session.commit()
     return redirect(url_for("ana_sayfa"))
+
+
+@uygulama.route("/anket/<int:anket_kimlik>/uyeler", methods=["GET", "POST"])
+def anket_üyeleri(anket_kimlik):
+    anket = anketi_getir(anket_kimlik, "yöneticilik_mi")
+    kimlik = session.get("kullanıcı_kimlik")
+    sahip_mi = (anket.sahip_kimlik == kimlik)
+
+    if request.method == "POST":
+        e_posta = request.form.get("e_posta", "").strip()
+        if not e_posta:
+            return render_template("anket_uyeler.html", anket=anket, üyelikler=anket.yetkiler, sahip_mi=sahip_mi, hata="E-posta adresi boş bırakılamaz")
+
+        hedef_kullanıcı = db.session.execute(
+            db.select(Kullanıcı).where(Kullanıcı.e_posta == e_posta)
+        ).scalar_one_or_none()
+
+        if not hedef_kullanıcı:
+            return render_template("anket_uyeler.html", anket=anket, üyelikler=anket.yetkiler, sahip_mi=sahip_mi, hata="Bu e-posta adresine sahip kullanıcı bulunamadı")
+
+        if hedef_kullanıcı.kimlik == anket.sahip_kimlik:
+            return render_template("anket_uyeler.html", anket=anket, üyelikler=anket.yetkiler, sahip_mi=sahip_mi, hata="Anket sahibi üye olarak eklenemez")
+
+        if hedef_kullanıcı.kimlik == kimlik:
+            return render_template("anket_uyeler.html", anket=anket, üyelikler=anket.yetkiler, sahip_mi=sahip_mi, hata="Kendi yetkilerinizi değiştiremezsiniz")
+
+        içerik_düzenleme_mi = "içerik_düzenleme_mi" in request.form
+        yayın_yönetimi_mi = "yayın_yönetimi_mi" in request.form
+        yanıtları_görme_mi = "yanıtları_görme_mi" in request.form
+        kullanıcı_tanımlama_mı = "kullanıcı_tanımlama_mı" in request.form
+        # Yöneticilik iznini yalnızca birincil sahip verebilir
+        yöneticilik_mi = ("yöneticilik_mi" in request.form) if sahip_mi else False
+
+        mevcut_yetki = yetkiyi_getir(anket, hedef_kullanıcı.kimlik)
+
+        if mevcut_yetki:
+            mevcut_yetki.içerik_düzenleme_mi = içerik_düzenleme_mi
+            mevcut_yetki.yayın_yönetimi_mi = yayın_yönetimi_mi
+            mevcut_yetki.yanıtları_görme_mi = yanıtları_görme_mi
+            mevcut_yetki.kullanıcı_tanımlama_mı = kullanıcı_tanımlama_mı
+            if sahip_mi:
+                mevcut_yetki.yöneticilik_mi = yöneticilik_mi
+            else:
+                mevcut_yetki.yöneticilik_mi = False
+        else:
+            yeni_yetki = AnketYetki(
+                anket_kimlik=anket_kimlik,
+                kullanıcı_kimlik=hedef_kullanıcı.kimlik,
+                içerik_düzenleme_mi=içerik_düzenleme_mi,
+                yayın_yönetimi_mi=yayın_yönetimi_mi,
+                yanıtları_görme_mi=yanıtları_görme_mi,
+                kullanıcı_tanımlama_mı=kullanıcı_tanımlama_mı,
+                yöneticilik_mi=yöneticilik_mi,
+            )
+            db.session.add(yeni_yetki)
+
+        db.session.commit()
+        return redirect(url_for("anket_üyeleri", anket_kimlik=anket_kimlik))
+
+    return render_template("anket_uyeler.html", anket=anket, üyelikler=anket.yetkiler, sahip_mi=sahip_mi)
+
+
+@uygulama.route("/anket/<int:anket_kimlik>/uye/<int:kullanici_kimlik>/cikar", methods=["POST"])
+def anket_üye_çıkarma(anket_kimlik, kullanici_kimlik):
+    anket = db.session.get(Anket, anket_kimlik)
+    if anket is None:
+        abort(404)
+    kimlik = session.get("kullanıcı_kimlik")
+    if not kimlik:
+        abort(403)
+
+    # Kendi üyeliğinden ayrılma durumu
+    if kullanici_kimlik == kimlik:
+        yetki = yetkiyi_getir(anket, kimlik)
+        if not yetki:
+            abort(404)
+        db.session.delete(yetki)
+        db.session.commit()
+        return redirect(url_for("ana_sayfa"))
+
+    # Başka bir üyeyi çıkarma (yöneticilik veya sahiplik gerekir)
+    anket = anketi_getir(anket_kimlik, "yöneticilik_mi")
+    if kullanici_kimlik == anket.sahip_kimlik:
+        abort(403)
+
+    yetki = yetkiyi_getir(anket, kullanici_kimlik)
+    if not yetki:
+        abort(404)
+
+    db.session.delete(yetki)
+    db.session.commit()
+    return redirect(url_for("anket_üyeleri", anket_kimlik=anket_kimlik))
 
 
 @uygulama.context_processor
@@ -417,12 +556,7 @@ def yanıt_sayfası(anket_kimlik):
 
 @uygulama.route("/anket/<int:anket_kimlik>/yanitlar")
 def anket_yanıtları(anket_kimlik):
-    anket = db.session.get(Anket, anket_kimlik)
-    kimlik = session.get("kullanıcı_kimlik")
-    if anket is None:
-        abort(404)
-    if anket.sahip_kimlik != kimlik:
-        abort(403)
+    anket = anketi_getir(anket_kimlik, "yanıtları_görme_mi")
 
     yanıtlar = db.session.execute(
         db.select(Yanıt).where(Yanıt.anket_kimlik == anket_kimlik).order_by(Yanıt.oluşturma_zamanı)
@@ -437,12 +571,7 @@ def anket_yanıtları(anket_kimlik):
 
 @uygulama.route("/anket/<int:anket_kimlik>/ozet")
 def anket_özeti(anket_kimlik):
-    anket = db.session.get(Anket, anket_kimlik)
-    kimlik = session.get("kullanıcı_kimlik")
-    if anket is None:
-        abort(404)
-    if anket.sahip_kimlik != kimlik:
-        abort(403)
+    anket = anketi_getir(anket_kimlik, "yanıtları_görme_mi")
 
     yanıtlar = db.session.execute(
         db.select(Yanıt).where(Yanıt.anket_kimlik == anket_kimlik)

@@ -27,6 +27,7 @@ class Anket(db.Model):
 
 
     yanıtlar = db.relationship("Yanıt", back_populates="anket", cascade="all, delete-orphan")
+    yetkiler = db.relationship("AnketYetki", back_populates="anket", cascade="all, delete-orphan")
 
 
 class Soru(db.Model):
@@ -76,5 +77,20 @@ class Cevap(db.Model):
     __table_args__ = (db.UniqueConstraint("yanıt_kimlik", "soru_kimlik"),)
     yanıt = db.relationship("Yanıt", back_populates="cevaplar")
     seçenek = db.relationship("Seçenek")
+
+class AnketYetki(db.Model):
+    __tablename__ = "anket_yetki"
+    kimlik = db.Column(db.Integer, primary_key=True)
+    anket_kimlik = db.Column(db.Integer, db.ForeignKey("anket.kimlik"), nullable=False)
+    kullanıcı_kimlik = db.Column(db.Integer, db.ForeignKey("kullanıcı.kimlik"), nullable=False)
+    içerik_düzenleme_mi = db.Column(db.Boolean, nullable=False, default=False)
+    yayın_yönetimi_mi = db.Column(db.Boolean, nullable=False, default=False)
+    yanıtları_görme_mi = db.Column(db.Boolean, nullable=False, default=False)
+    kullanıcı_tanımlama_mı = db.Column(db.Boolean, nullable=False, default=False)
+    yöneticilik_mi = db.Column(db.Boolean, nullable=False, default=False)
+    __table_args__ = (db.UniqueConstraint("anket_kimlik", "kullanıcı_kimlik"),)
+
+    anket = db.relationship("Anket", back_populates="yetkiler")
+    kullanıcı = db.relationship("Kullanıcı")
 
 
