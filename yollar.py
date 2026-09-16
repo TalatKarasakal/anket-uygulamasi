@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from uygulama import uygulama
 from uzantılar import db
 from modeller import Kullanıcı, Anket, Soru, Seçenek, Yanıt, Cevap
@@ -126,6 +127,34 @@ def anket_ayarları(anket_kimlik):
                 return render_template("anket_ayarlar.html", anket=anket, hata="Yanıt almış bir anketin anonimlik ayarı değiştirilemez")
             anket.anonim_mi = anonim_mi
 
+        süre_tipi = request.form.get("süre_tipi", "süre_yok")
+
+        if süre_tipi == "son_tarih":
+            son_tarih_metni = request.form.get("son_tarih", "").strip()
+            if not son_tarih_metni:
+                return render_template("anket_ayarlar.html", anket=anket, hata="Son tarih belirtilmelidir")
+            try:
+                yeni_son_tarih = datetime.fromisoformat(son_tarih_metni)
+            except ValueError:
+                return render_template("anket_ayarlar.html", anket=anket, hata="Geçersiz tarih formatı")
+            if yeni_son_tarih <= datetime.now():
+                return render_template("anket_ayarlar.html", anket=anket, hata="Son tarih gelecekte bir zaman olmalıdır")
+            anket.son_tarih = yeni_son_tarih
+            anket.süre_gün = None
+        elif süre_tipi == "süre_gün":
+            süre_gün_metni = request.form.get("süre_gün", "").strip()
+            try:
+                yeni_süre_gün = int(süre_gün_metni)
+                if yeni_süre_gün <= 0:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                return render_template("anket_ayarlar.html", anket=anket, hata="Süre pozitif bir gün sayısı olmalıdır")
+            anket.süre_gün = yeni_süre_gün
+            # süre_gün seçiliyse son_tarih'e dokunulmaz (yayına alma hesaplayacak)
+        else:
+            anket.son_tarih = None
+            anket.süre_gün = None
+
         anket.başlık = başlık
         anket.açıklama = açıklama
         anket.herkese_açık_mı = herkese_açık_mı
@@ -237,6 +266,8 @@ def anket_yayınlama(anket_kimlik):
         alan = TİP_İZİN_ALANI.get(soru.tip)
         if alan and not getattr(anket, alan):
             return render_template("anket_duzenle.html", anket=anket, hata=f"İzinsiz tipte soru ({soru.tip}) içerdiği için anket yayınlanamaz")
+    if anket.süre_gün:
+        anket.son_tarih = datetime.now() + timedelta(days=anket.süre_gün)
     anket.yayında_mı = True
     db.session.commit()
 
@@ -280,7 +311,11 @@ def anket_listesi():
         return redirect(url_for("giriş_ekranı"))
     anketler = db.session.execute(
         db.select(Anket)
-        .where(Anket.yayında_mı.is_(True), Anket.herkese_açık_mı.is_(True))
+        .where(
+            Anket.yayında_mı.is_(True),
+            Anket.herkese_açık_mı.is_(True),
+            db.or_(Anket.son_tarih.is_(None), Anket.son_tarih > datetime.now())
+        )
     ).scalars().all()
     return render_template("anketler.html", anketler=anketler)
 
@@ -305,6 +340,9 @@ def anket_yanıtlama(anket_kimlik):
     ).scalar_one_or_none()
     if yanıt:
         return redirect(url_for("yanıt_sayfası", anket_kimlik=anket_kimlik))
+
+    if anket.son_tarih and anket.son_tarih < datetime.now():
+        return render_template("anket_yanitla.html", anket=anket, hata="Bu anketin süresi dolmuştur")
 
     if request.method == "POST":
         yanıt = Yanıt(anket_kimlik=anket_kimlik, yanıtlayan_kimlik=kimlik)

@@ -21,7 +21,10 @@ class Anket(db.Model):
     evet_hayır_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
     ölçek_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
     çoktan_seçmeli_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
+    son_tarih = db.Column(db.DateTime, nullable=True)
+    süre_gün = db.Column(db.Integer, nullable=True)
     sorular = db.relationship("Soru", back_populates="anket", cascade="all, delete-orphan", order_by="Soru.sıra")
+
 
     yanıtlar = db.relationship("Yanıt", back_populates="anket", cascade="all, delete-orphan")
 

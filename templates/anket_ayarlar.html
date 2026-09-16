@@ -11,6 +11,30 @@
     <p><label><input type="checkbox" name="evet_hayır_izinli_mi" {% if anket.evet_hayır_izinli_mi %}checked{% endif %}> Evet / Hayır sorularına izin ver</label></p>
     <p><label><input type="checkbox" name="ölçek_izinli_mi" {% if anket.ölçek_izinli_mi %}checked{% endif %}> Ölçek sorularına izin ver</label></p>
     <p><label><input type="checkbox" name="çoktan_seçmeli_izinli_mi" {% if anket.çoktan_seçmeli_izinli_mi %}checked{% endif %}> Çoktan seçmeli sorulara izin ver</label></p>
+    <fieldset>
+        <legend>Süre Ayarı</legend>
+        <p>
+            <label>
+                <input type="radio" name="süre_tipi" value="süre_yok" {% if not anket.son_tarih and not anket.süre_gün %}checked{% endif %}>
+                Süre yok
+            </label>
+        </p>
+        <p>
+            <label>
+                <input type="radio" name="süre_tipi" value="son_tarih" {% if anket.son_tarih and not anket.süre_gün %}checked{% endif %}>
+                Son tarih:
+            </label>
+            <input type="datetime-local" name="son_tarih" value="{{ anket.son_tarih.strftime('%Y-%m-%dT%H:%M') if anket.son_tarih else '' }}">
+        </p>
+        <p>
+            <label>
+                <input type="radio" name="süre_tipi" value="süre_gün" {% if anket.süre_gün %}checked{% endif %}>
+                Gün sayısı:
+            </label>
+            <input type="number" name="süre_gün" min="1" value="{{ anket.süre_gün or '' }}">
+        </p>
+    </fieldset>
+
     <button type="submit">Kaydet</button>
 
 </form>
