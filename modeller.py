@@ -28,6 +28,7 @@ class Anket(db.Model):
 
     yanıtlar = db.relationship("Yanıt", back_populates="anket", cascade="all, delete-orphan")
     yetkiler = db.relationship("AnketYetki", back_populates="anket", cascade="all, delete-orphan")
+    tanımlamalar = db.relationship("AnketTanımlama", back_populates="anket", cascade="all, delete-orphan")
 
 
 class Soru(db.Model):
@@ -91,6 +92,16 @@ class AnketYetki(db.Model):
     __table_args__ = (db.UniqueConstraint("anket_kimlik", "kullanıcı_kimlik"),)
 
     anket = db.relationship("Anket", back_populates="yetkiler")
+    kullanıcı = db.relationship("Kullanıcı")
+
+class AnketTanımlama(db.Model):
+    __tablename__ = "anket_tanımlama"
+    kimlik = db.Column(db.Integer, primary_key=True)
+    anket_kimlik = db.Column(db.Integer, db.ForeignKey("anket.kimlik"), nullable=False)
+    kullanıcı_kimlik = db.Column(db.Integer, db.ForeignKey("kullanıcı.kimlik"), nullable=False)
+    __table_args__ = (db.UniqueConstraint("anket_kimlik", "kullanıcı_kimlik"),)
+
+    anket = db.relationship("Anket", back_populates="tanımlamalar")
     kullanıcı = db.relationship("Kullanıcı")
 
 

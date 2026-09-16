@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from uygulama import uygulama
 from uzantılar import db
-from modeller import Kullanıcı, Anket, Soru, Seçenek, Yanıt, Cevap, AnketYetki
+from modeller import Kullanıcı, Anket, Soru, Seçenek, Yanıt, Cevap, AnketYetki, AnketTanımlama
 from email_validator import validate_email, EmailNotValidError
 from flask import render_template, request, redirect, url_for, session, abort
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -60,8 +60,16 @@ def anket_duzenle_goster(anket, hata=None):
     sahip_mi = (anket.sahip_kimlik == kimlik)
     yetki = yetkiyi_getir(anket, kimlik)
     yönetici_mi = sahip_mi or (yetki and yetki.yöneticilik_mi)
+    tanımlama_yetkisi = sahip_mi or (yetki and (yetki.yöneticilik_mi or yetki.kullanıcı_tanımlama_mı))
     üye_mi = (yetki is not None)
-    return render_template("anket_duzenle.html", anket=anket, hata=hata, yönetici_mi=yönetici_mi, üye_mi=üye_mi)
+    return render_template(
+        "anket_duzenle.html",
+        anket=anket,
+        hata=hata,
+        yönetici_mi=yönetici_mi,
+        üye_mi=üye_mi,
+        tanımlama_yetkisi=tanımlama_yetkisi,
+    )
 
 @uygulama.route("/")
 def ana_sayfa():
@@ -438,6 +446,61 @@ def anket_üye_çıkarma(anket_kimlik, kullanici_kimlik):
     return redirect(url_for("anket_üyeleri", anket_kimlik=anket_kimlik))
 
 
+@uygulama.route("/anket/<int:anket_kimlik>/tanimlamalar", methods=["GET", "POST"])
+def anket_tanımlamaları(anket_kimlik):
+    anket = anketi_getir(anket_kimlik, "kullanıcı_tanımlama_mı")
+
+    if request.method == "POST":
+        e_posta = request.form.get("e_posta", "").strip()
+        if not e_posta:
+            return render_template("anket_tanimlamalar.html", anket=anket, tanımlamalar=anket.tanımlamalar, hata="E-posta adresi boş bırakılamaz")
+
+        hedef_kullanıcı = db.session.execute(
+            db.select(Kullanıcı).where(Kullanıcı.e_posta == e_posta)
+        ).scalar_one_or_none()
+
+        if not hedef_kullanıcı:
+            return render_template("anket_tanimlamalar.html", anket=anket, tanımlamalar=anket.tanımlamalar, hata="Bu e-posta adresine sahip kullanıcı bulunamadı")
+
+        mevcut_tanımlama = db.session.execute(
+            db.select(AnketTanımlama).where(
+                AnketTanımlama.anket_kimlik == anket_kimlik,
+                AnketTanımlama.kullanıcı_kimlik == hedef_kullanıcı.kimlik,
+            )
+        ).scalar_one_or_none()
+
+        if mevcut_tanımlama:
+            return render_template("anket_tanimlamalar.html", anket=anket, tanımlamalar=anket.tanımlamalar, hata="Bu kullanıcı zaten tanımlanmış")
+
+        yeni_tanımlama = AnketTanımlama(
+            anket_kimlik=anket_kimlik,
+            kullanıcı_kimlik=hedef_kullanıcı.kimlik,
+        )
+        db.session.add(yeni_tanımlama)
+        db.session.commit()
+        return redirect(url_for("anket_tanımlamaları", anket_kimlik=anket_kimlik))
+
+    return render_template("anket_tanimlamalar.html", anket=anket, tanımlamalar=anket.tanımlamalar)
+
+
+@uygulama.route("/anket/<int:anket_kimlik>/tanimlama/<int:kullanici_kimlik>/cikar", methods=["POST"])
+def anket_tanımlama_çıkarma(anket_kimlik, kullanici_kimlik):
+    anket = anketi_getir(anket_kimlik, "kullanıcı_tanımlama_mı")
+
+    tanımlama = db.session.execute(
+        db.select(AnketTanımlama).where(
+            AnketTanımlama.anket_kimlik == anket_kimlik,
+            AnketTanımlama.kullanıcı_kimlik == kullanici_kimlik,
+        )
+    ).scalar_one_or_none()
+    if not tanımlama:
+        abort(404)
+
+    db.session.delete(tanımlama)
+    db.session.commit()
+    return redirect(url_for("anket_tanımlamaları", anket_kimlik=anket_kimlik))
+
+
 @uygulama.context_processor
 def oturum_bilgisi():
     kimlik = session.get("kullanıcı_kimlik")
@@ -452,7 +515,12 @@ def anket_listesi():
         db.select(Anket)
         .where(
             Anket.yayında_mı.is_(True),
-            Anket.herkese_açık_mı.is_(True),
+            db.or_(
+                Anket.herkese_açık_mı.is_(True),
+                Anket.kimlik.in_(
+                    db.select(AnketTanımlama.anket_kimlik).where(AnketTanımlama.kullanıcı_kimlik == kimlik)
+                )
+            ),
             db.or_(Anket.son_tarih.is_(None), Anket.son_tarih > datetime.now())
         )
     ).scalars().all()
@@ -470,6 +538,16 @@ def anket_yanıtlama(anket_kimlik):
 
     if not anket.yayında_mı:
         abort(403)
+
+    if not anket.herkese_açık_mı:
+        tanımlı = db.session.execute(
+            db.select(AnketTanımlama).where(
+                AnketTanımlama.anket_kimlik == anket_kimlik,
+                AnketTanımlama.kullanıcı_kimlik == kimlik,
+            )
+        ).scalar_one_or_none()
+        if not tanımlı:
+            abort(403)
 
     yanıt = db.session.execute(
         db.select(Yanıt).where(
