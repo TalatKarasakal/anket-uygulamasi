@@ -61,4 +61,6 @@ class Cevap(db.Model):
     seçilen_seçenek_kimlik = db.Column(db.Integer, db.ForeignKey("seçenek.kimlik"), nullable=True)
     __table_args__ = (db.UniqueConstraint("yanıt_kimlik", "soru_kimlik"),)
     yanıt = db.relationship("Yanıt", back_populates="cevaplar")
+    seçenek = db.relationship("Seçenek")
+
 

@@ -208,7 +208,7 @@ def anket_yanıtlama(anket_kimlik):
         )
     ).scalar_one_or_none()
     if yanıt:
-        return redirect(url_for("anket_listesi"))
+        return redirect(url_for("yanıt_sayfası", anket_kimlik=anket_kimlik))
 
     if request.method == "POST":
         yanıt = Yanıt(anket_kimlik=anket_kimlik, yanıtlayan_kimlik=kimlik)
@@ -255,7 +255,29 @@ def anket_yanıtlama(anket_kimlik):
 
         db.session.add(yanıt)
         db.session.commit()
-        return redirect(url_for("anket_listesi"))
+        return redirect(url_for("yanıt_sayfası", anket_kimlik=anket_kimlik))
 
     return render_template("anket_yanitla.html", anket=anket)
+
+@uygulama.route("/anket/<int:anket_kimlik>/yanitim")
+def yanıt_sayfası(anket_kimlik):
+    kimlik = session.get("kullanıcı_kimlik")
+    if not kimlik:
+        return redirect(url_for("giriş_ekranı"))
+
+    anket = db.session.get(Anket, anket_kimlik)
+    if anket is None:
+        abort(404)
+
+    yanıt = db.session.execute(
+        db.select(Yanıt).where(
+            Yanıt.anket_kimlik == anket_kimlik,
+            Yanıt.yanıtlayan_kimlik == kimlik,
+        )
+    ).scalar_one_or_none()
+    if not yanıt:
+        return redirect(url_for("anket_yanıtlama", anket_kimlik=anket_kimlik))
+
+    cevaplar = {c.soru_kimlik: c for c in yanıt.cevaplar}
+    return render_template("anket_yanitim.html", anket=anket, yanıt=yanıt, cevaplar=cevaplar)
 
