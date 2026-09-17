@@ -295,7 +295,7 @@ def hesap_sil():
                 kullanıcı=kullanıcı,
                 anketler=anketler,
                 yanıt_sayısı=yanıt_sayısı,
-                hata=f"Hesap silme işlemi sırasında bir hata oluştu: {e}",
+                hata="Hesap silme işlemi sırasında bir hata oluştu. Lütfen tekrar deneyin.",
             )
 
     return render_template(
@@ -1316,7 +1316,7 @@ def anket_yanıtlama(anket_kimlik):
     if not anket.yayında_mı:
         abort(403)
 
-    if not anket.herkese_açık_mı:
+    if not anket.herkese_açık_mı and anket.sahip_kimlik != kimlik:
         tanımlı = db.session.execute(
             db.select(AnketTanımlama).where(
                 AnketTanımlama.anket_kimlik == anket_kimlik,
@@ -1329,7 +1329,7 @@ def anket_yanıtlama(anket_kimlik):
     # İG-47: Bekleyen zorunlu tanımlaması olan kullanıcı başka bir anketi yanıtlayamaz
     bekleyenler = bekleyen_zorunlu_tanımlama(kimlik)
     if bekleyenler and anket not in bekleyenler:
-        anket_bilgisi = ", ".join(f"'{a.başlık}' (ID: {a.kimlik})" for a in bekleyenler)
+        anket_bilgisi = ", ".join(f"'{a.başlık}'" for a in bekleyenler)
         hata = f"Öncelikle tamamlamanız gereken zorunlu anketler bulunmaktadır: {anket_bilgisi}"
         return render_template("anket_yanitla.html", anket=anket, hata=hata, bekleyenler=bekleyenler), 403
 
@@ -1577,38 +1577,32 @@ def anket_yanıtları(anket_kimlik):
 
     if anket.anonim_mi:
         yanıtlayanlar = {y.kimlik: f"Anonim {numaralar[y.kimlik]}" for y in kimlik_sıralı_yanıtlar}
-        if sıralama in ("puan", "değerlendirme_puanı", "puan_azalan"):
-            yanıtlar = sorted(
-                kimlik_sıralı_yanıtlar,
-                key=lambda y: (y.değerlendirme_puanı is not None, y.değerlendirme_puanı if y.değerlendirme_puanı is not None else 0),
-                reverse=True
-            )
-        elif sıralama == "puan_artan":
-            yanıtlar = sorted(
-                kimlik_sıralı_yanıtlar,
-                key=lambda y: (y.değerlendirme_puanı is None, y.değerlendirme_puanı if y.değerlendirme_puanı is not None else 0, y.kimlik)
-            )
-        else:
-            # Anonim ankette gönderim zamanı sıralaması sunulmaz; varsayılan numara (kimlik) sırasıdır
-            yanıtlar = kimlik_sıralı_yanıtlar
     else:
         yanıtlayanlar = {
             y.kimlik: (y.yanıtlayan.e_posta if y.yanıtlayan else "Silinmiş kullanıcı")
             for y in kimlik_sıralı_yanıtlar
         }
-        if sıralama in ("puan", "değerlendirme_puanı", "puan_azalan"):
-            yanıtlar = sorted(
-                kimlik_sıralı_yanıtlar,
-                key=lambda y: (y.değerlendirme_puanı is not None, y.değerlendirme_puanı if y.değerlendirme_puanı is not None else 0),
-                reverse=True
-            )
-        elif sıralama == "puan_artan":
-            yanıtlar = sorted(
-                kimlik_sıralı_yanıtlar,
-                key=lambda y: (y.değerlendirme_puanı is None, y.değerlendirme_puanı if y.değerlendirme_puanı is not None else 0, y.kimlik)
-            )
+
+    # İG-62a: Değerlendirmesi kapalıysa sıralama yok sayılır
+    if not anket.değerlendirilebilir_mi:
+        sıralama = ""
+
+    if sıralama in ("puan", "değerlendirme_puanı", "puan_azalan"):
+        yanıtlar = sorted(
+            kimlik_sıralı_yanıtlar,
+            key=lambda y: (y.değerlendirme_puanı is not None, y.değerlendirme_puanı if y.değerlendirme_puanı is not None else 0),
+            reverse=True
+        )
+    elif sıralama == "puan_artan":
+        yanıtlar = sorted(
+            kimlik_sıralı_yanıtlar,
+            key=lambda y: (y.değerlendirme_puanı is None, y.değerlendirme_puanı if y.değerlendirme_puanı is not None else 0, y.kimlik)
+        )
+    else:
+        # Varsayılan sıralama: Anonim ankette kimlik sırası, normal ankette gönderim zamanı sırası
+        if anket.anonim_mi:
+            yanıtlar = kimlik_sıralı_yanıtlar
         else:
-            # Normal ankette varsayılan: gönderim zamanı sırası
             yanıtlar = sorted(kimlik_sıralı_yanıtlar, key=lambda y: (y.gönderim_zamanı or datetime.min, y.kimlik))
 
     return render_template(
@@ -1658,10 +1652,10 @@ def anket_özeti(anket_kimlik):
         elif soru.tip == "ölçek":
             değerler = [c.sayısal_değer for c in cevaplar if c.sayısal_değer is not None]
             ortalama = round(sum(değerler) / len(değerler), 2) if değerler else None
-            alt_sınır = soru.ölçek_alt_sınırı if soru.ölçek_alt_sınırı is not None else 0
-            üst_sınır = soru.ölçek_üst_sınırı if soru.ölçek_üst_sınırı is not None else 10
+            alt = soru.ölçek_alt_sınırı
+            üst = soru.ölçek_üst_sınırı
             dağılım = []
-            for değer in range(alt_sınır, üst_sınır + 1):
+            for değer in range(alt, üst + 1):
                 adet = değerler.count(değer)
                 yüzde = round((adet / toplam_yanıt) * 100, 1) if toplam_yanıt > 0 else 0
                 dağılım.append({"değer": değer, "adet": adet, "yüzde": yüzde})

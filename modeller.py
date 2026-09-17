@@ -40,7 +40,7 @@ class Soru(db.Model):
     kimlik = db.Column(db.Integer, primary_key=True)
     anket_kimlik = db.Column(db.Integer, db.ForeignKey("anket.kimlik"), nullable=False)
     metin = db.Column(db.Text, nullable=False)
-    tip = db.Column(db.String(255), nullable=False)
+    tip = db.Column(db.String(20), nullable=False)
     zorunlu_mu = db.Column(db.Boolean, nullable=False, default=False)
     sıra = db.Column(db.Integer, nullable=False)
     ölçek_alt_sınırı = db.Column(db.Integer, nullable=True)
