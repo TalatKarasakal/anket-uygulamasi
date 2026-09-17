@@ -6,6 +6,7 @@ class Kullanıcı(db.Model):
     kimlik = db.Column(db.Integer, primary_key=True)
     e_posta = db.Column(db.String(255), unique=True, nullable=False)
     parola_özeti = db.Column(db.String(255), nullable=False)
+    kalıplar = db.relationship("Kalıp", back_populates="sahip", cascade="all, delete-orphan")
 
 class Anket(db.Model):
     __tablename__ = "anket"
@@ -23,6 +24,9 @@ class Anket(db.Model):
     çoktan_seçmeli_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
     son_tarih = db.Column(db.DateTime, nullable=True)
     süre_gün = db.Column(db.Integer, nullable=True)
+    değerlendirilebilir_mi = db.Column(db.Boolean, nullable=False, default=False)
+    değerlendirme_alt_sınırı = db.Column(db.Integer, nullable=True, default=0)
+    değerlendirme_üst_sınırı = db.Column(db.Integer, nullable=True, default=10)
     sorular = db.relationship("Soru", back_populates="anket", cascade="all, delete-orphan", order_by="Soru.sıra")
 
 
@@ -58,6 +62,8 @@ class Yanıt(db.Model):
     anket_kimlik = db.Column(db.Integer, db.ForeignKey("anket.kimlik"), nullable=False)
     yanıtlayan_kimlik = db.Column(db.Integer, db.ForeignKey("kullanıcı.kimlik"), nullable=True)
     oluşturma_zamanı = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    gönderim_zamanı = db.Column(db.DateTime, nullable=True)
+    gönderildi_mi = db.Column(db.Boolean, nullable=False, default=False)
     değerlendirme_puanı = db.Column(db.Integer, nullable=True)
     __table_args__ = (db.UniqueConstraint("anket_kimlik", "yanıtlayan_kimlik"),)
     cevaplar = db.relationship("Cevap", back_populates="yanıt", cascade="all, delete-orphan")
@@ -99,9 +105,27 @@ class AnketTanımlama(db.Model):
     kimlik = db.Column(db.Integer, primary_key=True)
     anket_kimlik = db.Column(db.Integer, db.ForeignKey("anket.kimlik"), nullable=False)
     kullanıcı_kimlik = db.Column(db.Integer, db.ForeignKey("kullanıcı.kimlik"), nullable=False)
+    zorunlu_mu = db.Column(db.Boolean, nullable=False, default=False)
     __table_args__ = (db.UniqueConstraint("anket_kimlik", "kullanıcı_kimlik"),)
 
     anket = db.relationship("Anket", back_populates="tanımlamalar")
     kullanıcı = db.relationship("Kullanıcı")
+
+class Kalıp(db.Model):
+    __tablename__ = "kalıp"
+    kimlik = db.Column(db.Integer, primary_key=True)
+    sahip_kimlik = db.Column(db.Integer, db.ForeignKey("kullanıcı.kimlik"), nullable=True)
+    ad = db.Column(db.String(100), nullable=False)
+    sistem_kalıbı_mı = db.Column(db.Boolean, nullable=False, default=False)
+    açık_uçlu_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
+    evet_hayır_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
+    ölçek_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
+    çoktan_seçmeli_izinli_mi = db.Column(db.Boolean, nullable=False, default=True)
+    anonim_mi = db.Column(db.Boolean, nullable=False, default=False)
+    herkese_açık_mı = db.Column(db.Boolean, nullable=False, default=False)
+    süre_gün = db.Column(db.Integer, nullable=True)
+    __table_args__ = (db.UniqueConstraint("sahip_kimlik", "ad"),)
+
+    sahip = db.relationship("Kullanıcı", back_populates="kalıplar")
 
 
