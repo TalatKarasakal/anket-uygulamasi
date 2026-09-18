@@ -1,19 +1,31 @@
-<!DOCTYPE html>
-<html lang="tr">
+{% extends "taban.html" %}
+{% block başlık %}Kayıt — Anket{% endblock %}
+{% block üst_çubuk %}{% endblock %}
+{% block gövde %}
+<div class="giriş-kabuğu">
+    <div class="giriş-kartı">
+        <div class="giriş-kartı__marka">
+            <span class="üst-çubuk__işareti"></span>
+            Anket
+        </div>
 
-<head>
-    <meta charset="utf-8">
-    <title>Kayıt Ol</title>
-</head>
+        <form method="post">
+            <div class="form-alanı">
+                <label class="alan-başlığı" for="e_posta">E-posta</label>
+                <input type="email" id="e_posta" name="e_posta" autocomplete="email" required>
+                <span class="yardım-metni">Size anket tanımlanabilmesi için bu adres kullanılır.</span>
+                {% if hata %}<span class="hata-yazısı">{{ hata }}</span>{% endif %}
+            </div>
+            <div class="form-alanı">
+                <label class="alan-başlığı" for="parola">Parola</label>
+                <input type="password" id="parola" name="parola" autocomplete="new-password" required>
+            </div>
+            <button type="submit" class="düğme düğme--birincil düğme--geniş">Hesap oluştur</button>
+        </form>
 
-<body>
-    <h1>Kayıt Ol</h1>
-    <form method="post">
-        <label>E-posta <input type="email" name="e_posta" required></label>
-        <label>Parola <input type="password" name="parola" required></label>
-        <button type="submit">Kayıt Ol</button>
-    </form>
-    <p><a href="{{ url_for('giriş_ekranı') }}">Zaten hesabın var mı? Giriş yap</a></p>
-</body>
-
-</html>
+        <p class="giriş-kartı__alt">
+            Hesabınız var mı? <a href="{{ url_for('giriş_ekranı') }}">Giriş yap</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

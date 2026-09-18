@@ -3,22 +3,58 @@
 
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block başlık %}Anket Uygulaması{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='stil.css') }}">
 </head>
 
 <body>
-    <nav>
-        <a href="{{ url_for('ana_sayfa') }}">Ana sayfa</a>
-        {% if oturum_kullanıcısı %}
-        <span>{{ oturum_kullanıcısı.e_posta }}</span>
-        <a href="{{ url_for('çıkış') }}">Çıkış yap</a>
-        {% else %}
-        <a href="{{ url_for('giriş_ekranı') }}">Giriş yap</a>
-        <a href="{{ url_for('kayıt_ekranı') }}">Kayıt ol</a>
-        {% endif %}
+    {% block üst_çubuk %}
+    <nav class="üst-çubuk">
+        <div class="üst-çubuk__içi">
+            <a class="üst-çubuk__marka" href="{{ url_for('ana_sayfa') }}">
+                <span class="üst-çubuk__işareti"></span>
+                Anket
+            </a>
+            <div class="üst-çubuk__bağlantılar">
+                <a class="üst-çubuk__bağlantı {% if request.endpoint == 'ana_sayfa' %}üst-çubuk__bağlantı--etkin{% endif %}"
+                    href="{{ url_for('ana_sayfa') }}">Ana sayfa</a>
+                {% if oturum_kullanıcısı %}
+                <a class="üst-çubuk__bağlantı {% if request.endpoint and request.endpoint.startswith('kalıp') %}üst-çubuk__bağlantı--etkin{% endif %}"
+                    href="{{ url_for('kalıp_listesi') }}">Kalıplar</a>
+                <div class="üst-çubuk__kullanıcı">
+                    <details class="hesap-menüsü">
+                        <summary class="hesap-menüsü__düğmesi" title="{{ oturum_kullanıcısı.e_posta }}">
+                            <span class="hesap-menüsü__çemberi">{{ oturum_kullanıcısı.e_posta[0]|upper }}</span>
+                        </summary>
+                        <div class="hesap-menüsü__gövdesi">
+                            <p class="hesap-menüsü__eposta">{{ oturum_kullanıcısı.e_posta }}</p>
+                            <a href="{{ url_for('hesap_sil') }}">Hesabı sil</a>
+                            <a href="{{ url_for('çıkış') }}">Çıkış yap</a>
+                        </div>
+                    </details>
+                </div>
+                {% else %}
+                <a class="üst-çubuk__bağlantı" href="{{ url_for('giriş_ekranı') }}">Giriş yap</a>
+                <a class="düğme düğme--birincil düğme--küçük" href="{{ url_for('kayıt_ekranı') }}">Kayıt ol</a>
+                {% endif %}
+            </div>
+        </div>
     </nav>
-    {% if hata %}<p>{{ hata }}</p>{% endif %}
-    {% block içerik %}{% endblock %}
+    {% endblock %}
+
+    {% block şerit %}{% endblock %}
+
+    {% block gövde %}
+    <main class="sayfa-kabuğu {% block kabuk_sınıfı %}{% endblock %}">
+        {% if hata %}<div class="uyarı-kutusu">{{ hata }}</div>{% endif %}
+        {% block içerik %}{% endblock %}
+    </main>
+    {% endblock %}
 </body>
 
 </html>

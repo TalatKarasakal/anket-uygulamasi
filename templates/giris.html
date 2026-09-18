@@ -1,10 +1,30 @@
 {% extends "taban.html" %}
-{% block başlık %}Giriş Yap{% endblock %}
-{% block içerik %}
-<h1>Giriş Yap</h1>
-<form method="post">
-    <label>E-posta <input type="email" name="e_posta" required></label>
-    <label>Parola <input type="password" name="parola" required></label>
-    <button type="submit">Giriş Yap</button>
-</form>
+{% block başlık %}Giriş — Anket{% endblock %}
+{% block üst_çubuk %}{% endblock %}
+{% block gövde %}
+<div class="giriş-kabuğu">
+    <div class="giriş-kartı">
+        <div class="giriş-kartı__marka">
+            <span class="üst-çubuk__işareti"></span>
+            Anket
+        </div>
+
+        <form method="post">
+            <div class="form-alanı">
+                <label class="alan-başlığı" for="e_posta">E-posta</label>
+                <input type="email" id="e_posta" name="e_posta" autocomplete="email" required>
+            </div>
+            <div class="form-alanı">
+                <label class="alan-başlığı" for="parola">Parola</label>
+                <input type="password" id="parola" name="parola" autocomplete="current-password" required>
+                {% if hata %}<span class="hata-yazısı">{{ hata }}</span>{% endif %}
+            </div>
+            <button type="submit" class="düğme düğme--birincil düğme--geniş">Giriş yap</button>
+        </form>
+
+        <p class="giriş-kartı__alt">
+            Hesabınız yok mu? <a href="{{ url_for('kayıt_ekranı') }}">Kayıt ol</a>
+        </p>
+    </div>
+</div>
 {% endblock %}
