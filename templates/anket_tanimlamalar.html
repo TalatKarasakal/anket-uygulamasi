@@ -1,0 +1,57 @@
+{% extends "taban.html" %}
+{% block başlık %}{{ anket.başlık }} — Tanımlamalar{% endblock %}
+{% block kabuk_sınıfı %}sayfa-kabuğu--dar{% endblock %}
+{% block içerik %}
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>Tanımlanan kullanıcılar</h1>
+        <p class="başlık-şeridi__açıklama">
+            {{ anket.başlık }} · Tanımlanan kullanıcılar, anket herkese açık olmasa da yanıtlayabilir.
+            Zorunlu tanımlama, kullanıcının başka anket yanıtlamasını engeller.
+        </p>
+    </div>
+    <div class="başlık-şeridi__eylemler">
+        <a class="düğme düğme--küçük"
+            href="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">Ankete dön</a>
+    </div>
+</div>
+
+<div class="kağıt">
+    {% if tanımlamalar %}
+    <table class="çizelge">
+        <tr>
+            <th>E-posta</th>
+            <th>Zorunlu</th>
+            <th></th>
+        </tr>
+        {% for tanımlama in tanımlamalar %}
+        <tr>
+            <td>{{ tanımlama.kullanıcı.e_posta if tanımlama.kullanıcı else "Silinmiş kullanıcı" }}</td>
+            <td>{% if tanımlama.zorunlu_mu %}<span class="işaret işaret--zorunlu">Zorunlu</span>{% else %}<span
+                    class="yanıtlanmadı">—</span>{% endif %}</td>
+            <td class="çizelge__sağ">
+                <form class="satıriçi-form" method="post"
+                    action="{{ url_for('anket_tanımlama_çıkarma', anket_kimlik=anket.kimlik, kullanici_kimlik=tanımlama.kullanıcı_kimlik) }}">
+                    <button type="submit" class="düğme düğme--sessiz düğme--küçük">Çıkar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p class="boş-durum">Henüz tanımlanan kullanıcı yok.</p>
+    {% endif %}
+</div>
+
+<div class="kağıt" style="margin-top:14px">
+    <p class="kağıt__başlık">Kullanıcı tanımla</p>
+    <form method="post" style="margin-top:12px">
+        <div class="form-alanı">
+            <label class="alan-başlığı" for="e_posta">E-posta</label>
+            <input type="email" id="e_posta" name="e_posta" required>
+        </div>
+        <label class="kutu-satırı"><input type="checkbox" name="zorunlu_mu"><span>Zorunlu olarak tanımla</span></label>
+        <button type="submit" class="düğme düğme--birincil" style="margin-top:12px">Tanımla</button>
+    </form>
+</div>
+{% endblock %}

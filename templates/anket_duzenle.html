@@ -1,74 +1,365 @@
 {% extends "taban.html" %}
-{% block başlık %}{{ anket.başlık }}{% endblock %}
+{% block başlık %}{{ anket.başlık }} — Anket düzenleme{% endblock %}
 {% block içerik %}
-<h1>{{ anket.başlık }}</h1>
-{% if anket.açıklama %}<p>{{ anket.açıklama }}</p>{% endif %}
-<h2>Sorular</h2>
-<ul>
-    {% for soru in anket.sorular %}
-    <li>
-        {{ soru.metin }} ({{ soru.tip }})
-        {% if soru.seçenekler %}
-        <ul>{% for seçenek in soru.seçenekler %}<li>{{ seçenek.metin }}</li>{% endfor %}</ul>
+{% set biçim = form if form is defined and form else None %}
+{% set düzenlenebilir = içerik_yetkisi and not anket.yayında_mı %}
+{% set b_başlık = biçim.get('başlık') if biçim else anket.başlık %}
+{% set b_açıklama = biçim.get('açıklama') if biçim else (anket.açıklama or '') %}
+{% set b_anonim = ('anonim_mi' in biçim) if biçim else anket.anonim_mi %}
+{% set b_değerlendirme = ('değerlendirilebilir_mi' in biçim) if biçim else anket.değerlendirilebilir_mi %}
+{% set b_alt = biçim.get('değerlendirme_alt_sınırı') if biçim else (anket.değerlendirme_alt_sınırı if anket.değerlendirme_alt_sınırı is not none else '') %}
+{% set b_üst = biçim.get('değerlendirme_üst_sınırı') if biçim else (anket.değerlendirme_üst_sınırı if anket.değerlendirme_üst_sınırı is not none else '') %}
+{% set b_erişim = biçim.get('erişim_tipi') if biçim else ('herkese_açık' if anket.herkese_açık_mı else 'tanımlı') %}
+{% set b_süre_tipi = biçim.get('süre_tipi') if biçim else ('son_tarih' if anket.son_tarih and not anket.süre_gün else ('süre_gün' if anket.süre_gün else 'süre_yok')) %}
+{% set b_son_tarih = biçim.get('son_tarih', '') if biçim else (anket.son_tarih.strftime('%Y-%m-%dT%H:%M') if anket.son_tarih else '') %}
+{% set b_süre_gün = biçim.get('süre_gün', '') if biçim else (anket.süre_gün or '') %}
+
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>{{ anket.başlık }}</h1>
+        {% if anket.kaynak_kalıp_adı %}
+        <p class="başlık-şeridi__açıklama">
+            {{ anket.kaynak_kalıp_adı }} kalıbından oluşturuldu. Kalıpta yapılacak değişiklikler bu anketi etkilemez.
+        </p>
         {% endif %}
-    </li>
-    {% else %}
-    <li>Henüz soru eklenmemiş.</li>
-    {% endfor %}
-</ul>
-
-{% if not anket.yayında_mı %}
-<form method="post" action="{{ url_for('anket_yayınlama', anket_kimlik=anket.kimlik) }}">
-    <button type="submit">Yayına al</button>
-</form>
-{% else %}
-<p>Bu anket yayında.</p>
-<form method="post" action="{{ url_for('anket_yayından_alma', anket_kimlik=anket.kimlik) }}">
-    <button type="submit">Yayından al</button>
-</form>
-{% endif %}
-
-<p><a href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik) }}">Yanıtları gör</a></p>
-<p><a href="{{ url_for('anket_özeti', anket_kimlik=anket.kimlik) }}">Özeti gör</a></p>
-<p><a href="{{ url_for('anket_ayarları', anket_kimlik=anket.kimlik) }}">Ayarları düzenle</a></p>
-
-
-
-
-{% if not anket.yayında_mı %}
-<h2>Soru Ekle</h2>
-<form method="post" action="{{ url_for('soru_ekleme', anket_kimlik=anket.kimlik) }}">
-    <p><label>Soru metni <input type="text" name="metin" required></label></p>
-    <p>
-        <label>Tip
-            <select name="tip">
-                <option value="açık uçlu">Açık uçlu</option>
-                <option value="evet/hayır">Evet / Hayır</option>
-                <option value="ölçek">Ölçek</option>
-                <option value="çoktan seçmeli">Çoktan seçmeli</option>
-            </select>
-        </label>
-    </p>
-    <p><label>Ölçek alt sınırı <input type="number" name="ölçek_alt_sınırı"></label></p>
-    <p><label>Ölçek üst sınırı <input type="number" name="ölçek_üst_sınırı"></label></p>
-    <p><label><input type="checkbox" name="zorunlu_mu"> Zorunlu</label></p>
-    <button type="submit">Ekle</button>
-
-    <p>Seçenekler</p>
-    <div id="secenek-kutulari">
-        <p><input type="text" name="seçenek"></p>
-        <p><input type="text" name="seçenek"></p>
     </div>
-    <p><button type="button" id="secenek-ekle">Seçenek ekle</button></p>
+    <div class="başlık-şeridi__eylemler">
+        {% if anket.yayında_mı %}
+        <span class="işaret işaret--yayında">Yayında</span>
+        {% else %}
+        <span class="işaret işaret--taslak">Yayında değil</span>
+        {% endif %}
+        {% if yanıt_görme_yetkisi %}
+        <a class="düğme düğme--küçük" href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik) }}">Yanıtlar</a>
+        {% endif %}
+        {% if yönetici_mi %}
+        <a class="düğme düğme--küçük" href="{{ url_for('anket_üyeleri', anket_kimlik=anket.kimlik) }}">Üyeler</a>
+        {% endif %}
+        {% if tanımlama_yetkisi %}
+        <a class="düğme düğme--küçük"
+            href="{{ url_for('anket_tanımlamaları', anket_kimlik=anket.kimlik) }}">Tanımlamalar</a>
+        {% endif %}
+        {% if sahip_mi %}
+        <a class="düğme düğme--küçük"
+            href="{{ url_for('anketten_kalıp_türetme', anket_kimlik=anket.kimlik) }}">Kalıp türet</a>
+        {% endif %}
+    </div>
+</div>
+
+<form method="post" action="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">
+    <div class="sütunlar sütunlar--iki">
+
+        {# ------------------------------------------------- SOL: içerik #}
+        <div>
+            {% if içerik_yetkisi %}
+            <input type="hidden" name="içerik_bölümü" value="1">
+            <div class="kağıt">
+                <div class="form-alanı">
+                    <label class="alan-başlığı" for="başlık">Başlık</label>
+                    <input type="text" id="başlık" name="başlık" maxlength="50" required value="{{ b_başlık }}">
+                </div>
+                <div class="form-alanı" style="margin-bottom:0">
+                    <label class="alan-başlığı" for="açıklama">Açıklama</label>
+                    <textarea id="açıklama" name="açıklama">{{ b_açıklama }}</textarea>
+                </div>
+            </div>
+            {% else %}
+            <div class="kağıt">
+                <p class="kağıt__başlık">{{ anket.başlık }}</p>
+                {% if anket.açıklama %}<p class="kağıt__açıklama">{{ anket.açıklama }}</p>{% endif %}
+                <p class="kağıt__alt">İçeriği değiştirmek için içerik düzenleme izni gerekir.</p>
+            </div>
+            {% endif %}
+
+            <p class="bölüm-başlığı" style="margin-top:22px">Sorular</p>
+
+            {% if anket.yayında_mı %}
+            <p class="uyarı-kutusu uyarı-kutusu--bilgi">
+                Anket yayında olduğu için sorular değiştirilemez. Düzenlemek için önce yayından alın.
+            </p>
+            {% endif %}
+
+            <div class="yığın">
+                {% for soru in anket.sorular %}
+                {% set ön = 'soru_' ~ soru.kimlik ~ '_' %}
+                {% set uyarılı_mı = soru.kimlik in izinsiz_soru_kimlikleri %}
+                {% set s_metin = biçim.get(ön ~ 'metin') if biçim else soru.metin %}
+                {% set s_tip = biçim.get(ön ~ 'tip') if biçim else soru.tip %}
+                {% set s_alt = biçim.get(ön ~ 'alt') if biçim else (soru.ölçek_alt_sınırı if soru.ölçek_alt_sınırı is not none else '') %}
+                {% set s_üst = biçim.get(ön ~ 'üst') if biçim else (soru.ölçek_üst_sınırı if soru.ölçek_üst_sınırı is not none else '') %}
+                {% set s_zorunlu = ((ön ~ 'zorunlu_mu') in biçim) if biçim else soru.zorunlu_mu %}
+                {% set s_seçenekler = biçim.getlist(ön ~ 'seçenek') if biçim else (soru.seçenekler | map(attribute='metin') | list) %}
+                <div class="soru-kartı {% if uyarılı_mı %}soru-kartı--uyarılı{% endif %}">
+                    <div class="soru-kartı__üstü">
+                        <span class="soru-kartı__sırası">{{ loop.index }}</span>
+                        <div class="soru-kartı__gövdesi">
+
+                            {% if düzenlenebilir %}
+                            <div class="soru-satırı">
+                                <input type="text" name="{{ ön }}metin" required value="{{ s_metin }}">
+                                <select class="tip-seçimi" name="{{ ön }}tip">
+                                    <option value="açık uçlu" {% if s_tip == 'açık uçlu' %}selected{% endif %}>Açık uçlu
+                                    </option>
+                                    <option value="evet/hayır" {% if s_tip == 'evet/hayır' %}selected{% endif %}>Evet /
+                                        Hayır</option>
+                                    <option value="ölçek" {% if s_tip == 'ölçek' %}selected{% endif %}>Ölçek</option>
+                                    <option value="çoktan seçmeli" {% if s_tip == 'çoktan seçmeli' %}selected{% endif
+                                        %}>Çoktan seçmeli</option>
+                                </select>
+                            </div>
+
+                            <div class="ölçek-alanı satır" style="margin-top:9px">
+                                <label class="alan-başlığı" style="margin:0">Alt sınır</label>
+                                <input class="dar-alan" type="number" name="{{ ön }}alt" value="{{ s_alt }}">
+                                <label class="alan-başlığı" style="margin:0">Üst sınır</label>
+                                <input class="dar-alan" type="number" name="{{ ön }}üst" value="{{ s_üst }}">
+                                <span class="yardım-metni" style="margin:0">−5 ile 10 arası, genişlik en fazla 10</span>
+                            </div>
+
+                            <div class="seçenek-alanı" style="margin-top:9px">
+                                <label class="alan-başlığı">Seçenekler</label>
+                                <div class="seçenek-kutuları yığın" style="gap:6px">
+                                    {% for seçenek_metni in s_seçenekler %}
+                                    <input type="text" name="{{ ön }}seçenek" value="{{ seçenek_metni }}">
+                                    {% endfor %}
+                                    {% for boş_sıra in range(2 - s_seçenekler|length) %}
+                                    <input type="text" name="{{ ön }}seçenek">
+                                    {% endfor %}
+                                </div>
+                                <button type="button" class="düğme düğme--sessiz düğme--küçük seçenek-ekle"
+                                    style="margin-top:6px">Seçenek ekle</button>
+                            </div>
+
+                            <label class="kutu-satırı" style="margin-top:9px">
+                                <input type="checkbox" name="{{ ön }}zorunlu_mu" {% if s_zorunlu %}checked{% endif %}>
+                                <span>Zorunlu</span>
+                            </label>
+
+                            {% else %}
+                            <p style="font-weight:600">{{ soru.metin }}{% if soru.zorunlu_mu %} <span
+                                    class="zorunlu-işareti">*</span>{% endif %}</p>
+                            <p class="kağıt__alt" style="margin-top:5px">
+                                <span class="çip">{{ soru.tip }}</span>
+                                {% if soru.tip == 'ölçek' %}<span>{{ soru.ölçek_alt_sınırı }}–{{ soru.ölçek_üst_sınırı
+                                    }}</span>{% endif %}
+                            </p>
+                            {% if soru.seçenekler %}
+                            <ul class="seçenek-listesi">
+                                {% for seçenek in soru.seçenekler %}<li>{{ seçenek.metin }}</li>{% endfor %}
+                            </ul>
+                            {% endif %}
+                            {% endif %}
+
+                            {% if uyarılı_mı %}
+                            <p class="hata-yazısı">
+                                &#9888; Bu soru tipine anket ayarlarında izin verilmiyor; anket yayına alınamaz.
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if düzenlenebilir %}
+                    <div class="soru-kartı__eylemleri">
+                        <button type="submit" class="düğme düğme--sessiz düğme--küçük" name="yön" value="yukarı"
+                            formnovalidate
+                            formaction="{{ url_for('soru_sıralama', anket_kimlik=anket.kimlik, soru_kimlik=soru.kimlik) }}">&uarr;
+                            Yukarı</button>
+                        <button type="submit" class="düğme düğme--sessiz düğme--küçük" name="yön" value="aşağı"
+                            formnovalidate
+                            formaction="{{ url_for('soru_sıralama', anket_kimlik=anket.kimlik, soru_kimlik=soru.kimlik) }}">&darr;
+                            Aşağı</button>
+                        <button type="submit" class="düğme düğme--sessiz düğme--küçük" formnovalidate
+                            style="margin-left:auto"
+                            formaction="{{ url_for('soru_silme', anket_kimlik=anket.kimlik, soru_kimlik=soru.kimlik) }}">Soruyu
+                            sil</button>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p class="boş-durum">Henüz soru eklenmedi.</p>
+                {% endfor %}
+            </div>
+
+            {% if düzenlenebilir %}
+            <div class="soru-kartı" style="margin-top:14px">
+                <p class="bölüm-başlığı bölüm-başlığı--ilk">Yeni soru</p>
+                <div class="soru-satırı">
+                    <input type="text" name="metin" placeholder="Soru metni">
+                    <select class="tip-seçimi" name="tip">
+                        <option value="açık uçlu">Açık uçlu</option>
+                        <option value="evet/hayır">Evet / Hayır</option>
+                        <option value="ölçek">Ölçek</option>
+                        <option value="çoktan seçmeli">Çoktan seçmeli</option>
+                    </select>
+                </div>
+                <div class="ölçek-alanı satır" style="margin-top:9px">
+                    <label class="alan-başlığı" style="margin:0">Alt sınır</label>
+                    <input class="dar-alan" type="number" name="ölçek_alt_sınırı">
+                    <label class="alan-başlığı" style="margin:0">Üst sınır</label>
+                    <input class="dar-alan" type="number" name="ölçek_üst_sınırı">
+                </div>
+                <div class="seçenek-alanı" style="margin-top:9px">
+                    <label class="alan-başlığı">Seçenekler</label>
+                    <div class="seçenek-kutuları yığın" style="gap:6px">
+                        <input type="text" name="seçenek">
+                        <input type="text" name="seçenek">
+                    </div>
+                    <button type="button" class="düğme düğme--sessiz düğme--küçük seçenek-ekle"
+                        style="margin-top:6px">Seçenek ekle</button>
+                </div>
+                <label class="kutu-satırı" style="margin-top:9px">
+                    <input type="checkbox" name="zorunlu_mu">
+                    <span>Zorunlu</span>
+                </label>
+                <button type="submit" class="düğme düğme--küçük" formnovalidate
+                    formaction="{{ url_for('soru_ekleme', anket_kimlik=anket.kimlik) }}">Soru ekle</button>
+            </div>
+            {% endif %}
+        </div>
+
+        {# ------------------------------------------------ SAĞ: ayarlar #}
+        <aside>
+            <p class="bölüm-başlığı bölüm-başlığı--ilk">Ayarlar</p>
+            <div class="kağıt">
+
+                <p class="kağıt__başlık">İzin verilen soru tipleri</p>
+                <p class="yardım-metni">İçerik düzenleme izni gerekir</p>
+                {% for alan_adı, alan_yazısı in [('açık_uçlu_izinli_mi', 'Açık uçlu'), ('ölçek_izinli_mi', 'Ölçek'),
+                ('evet_hayır_izinli_mi', 'Evet/hayır'), ('çoktan_seçmeli_izinli_mi', 'Çoktan seçmeli')] %}
+                {% set açık_mı = (alan_adı in biçim) if biçim else anket[alan_adı] %}
+                <label class="kutu-satırı {% if not içerik_yetkisi %}kutu-satırı--kilitli{% endif %}">
+                    <input type="checkbox" name="{{ alan_adı }}" {% if not içerik_yetkisi %}disabled{% endif %} {% if açık_mı
+                        %}checked{% endif %}>
+                    <span>{{ alan_yazısı }}</span>
+                </label>
+                {% endfor %}
+
+                <hr class="ayraç" style="margin:16px 0">
+
+                {% if yayın_yetkisi %}<input type="hidden" name="yayın_bölümü" value="1">{% endif %}
+
+                <p class="kağıt__başlık">Yanıtlama</p>
+                <p class="yardım-metni">Yayın yönetimi izni gerekir</p>
+                <label
+                    class="kutu-satırı {% if not yayın_yetkisi or anonimlik_kilitli_mi %}kutu-satırı--kilitli{% endif %}">
+                    <input type="checkbox" name="anonim_mi" {% if not yayın_yetkisi or anonimlik_kilitli_mi %}disabled{%
+                        endif %} {% if b_anonim %}checked{% endif %}>
+                    <span>Anonim yanıtlansın</span>
+                </label>
+                {% if anonimlik_kilitli_mi %}
+                <p class="yardım-metni">Ankete yanıt geldiği için değiştirilemez.</p>
+                {% if anket.anonim_mi %}<input type="hidden" name="anonim_mi" value="on">{% endif %}
+                {% endif %}
+
+                <label class="kutu-satırı {% if not yayın_yetkisi %}kutu-satırı--kilitli{% endif %}">
+                    <input type="checkbox" name="değerlendirilebilir_mi" {% if not yayın_yetkisi %}disabled{% endif %} {%
+                        if b_değerlendirme %}checked{% endif %}>
+                    <span>Değerlendirmeye açık</span>
+                </label>
+                <div class="satır" style="margin-top:6px">
+                    <label class="alan-başlığı" style="margin:0">Alt</label>
+                    <input class="dar-alan" type="number" name="değerlendirme_alt_sınırı" value="{{ b_alt }}" {% if not
+                        yayın_yetkisi %}disabled{% endif %}>
+                    <label class="alan-başlığı" style="margin:0">Üst</label>
+                    <input class="dar-alan" type="number" name="değerlendirme_üst_sınırı" value="{{ b_üst }}" {% if not
+                        yayın_yetkisi %}disabled{% endif %}>
+                </div>
+                <p class="yardım-metni">Katılımcı anketi bütün olarak puanlar.</p>
+
+                <hr class="ayraç" style="margin:16px 0">
+
+                <p class="kağıt__başlık">Erişim</p>
+                <p class="yardım-metni">Yayın yönetimi izni gerekir</p>
+                <label class="kutu-satırı {% if not yayın_yetkisi %}kutu-satırı--kilitli{% endif %}">
+                    <input type="radio" name="erişim_tipi" value="herkese_açık" {% if not yayın_yetkisi %}disabled{%
+                        endif %} {% if b_erişim == 'herkese_açık' %}checked{% endif %}>
+                    <span>Herkese açık</span>
+                </label>
+                <label class="kutu-satırı {% if not yayın_yetkisi %}kutu-satırı--kilitli{% endif %}">
+                    <input type="radio" name="erişim_tipi" value="tanımlı" {% if not yayın_yetkisi %}disabled{% endif %}
+                        {% if b_erişim == 'tanımlı' %}checked{% endif %}>
+                    <span>Yalnızca tanımlananlara açık</span>
+                </label>
+
+                <hr class="ayraç" style="margin:16px 0">
+
+                <p class="kağıt__başlık">Bitiş</p>
+                <p class="yardım-metni">Yayın yönetimi izni gerekir</p>
+                <label class="kutu-satırı {% if not yayın_yetkisi %}kutu-satırı--kilitli{% endif %}">
+                    <input type="radio" name="süre_tipi" value="süre_yok" {% if not yayın_yetkisi %}disabled{% endif %}
+                        {% if b_süre_tipi == 'süre_yok' %}checked{% endif %}>
+                    <span>Süresiz</span>
+                </label>
+                <label class="kutu-satırı {% if not yayın_yetkisi %}kutu-satırı--kilitli{% endif %}">
+                    <input type="radio" name="süre_tipi" value="son_tarih" {% if not yayın_yetkisi %}disabled{% endif %}
+                        {% if b_süre_tipi == 'son_tarih' %}checked{% endif %}>
+                    <span>Son tarih</span>
+                </label>
+                <input type="datetime-local" name="son_tarih" value="{{ b_son_tarih }}" {% if not yayın_yetkisi
+                    %}disabled{% endif %}>
+                <label class="kutu-satırı {% if not yayın_yetkisi %}kutu-satırı--kilitli{% endif %}"
+                    style="margin-top:8px">
+                    <input type="radio" name="süre_tipi" value="süre_gün" {% if not yayın_yetkisi %}disabled{% endif %}
+                        {% if b_süre_tipi == 'süre_gün' %}checked{% endif %}>
+                    <span>Yayından itibaren gün sayısı</span>
+                </label>
+                <input class="dar-alan" type="number" name="süre_gün" min="1" value="{{ b_süre_gün }}" {% if not
+                    yayın_yetkisi %}disabled{% endif %}>
+            </div>
+
+            <div class="kağıt" style="margin-top:14px">
+                <button type="submit" class="düğme düğme--birincil düğme--geniş">Kaydet</button>
+
+                <div class="düğme-öbeği" style="margin-top:10px">
+                    {% if not anket.yayında_mı %}
+                    <button type="submit" class="düğme" formnovalidate {% if yayın_engeli %}disabled{% endif %}
+                        formaction="{{ url_for('anket_yayınlama', anket_kimlik=anket.kimlik) }}">Yayına al</button>
+                    {% else %}
+                    <button type="submit" class="düğme" formnovalidate
+                        formaction="{{ url_for('anket_yayından_alma', anket_kimlik=anket.kimlik) }}">Yayından al</button>
+                    {% endif %}
+                    {% if sahip_mi %}
+                    <button type="submit" class="düğme düğme--tehlike" formnovalidate
+                        formaction="{{ url_for('anket_silme', anket_kimlik=anket.kimlik) }}">Anketi sil</button>
+                    {% endif %}
+                </div>
+
+                {% if yayın_engeli and not anket.yayında_mı %}
+                <p class="hata-yazısı">{{ yayın_engeli }}</p>
+                {% endif %}
+            </div>
+        </aside>
+    </div>
 </form>
 
 <script>
-    document.getElementById("secenek-ekle").addEventListener("click", function () {
-        const kutu = document.createElement("p");
-        kutu.innerHTML = '<input type="text" name="seçenek">';
-        document.getElementById("secenek-kutulari").appendChild(kutu);
+    // Her soru kartında tip seçimine göre ölçek ve seçenek alanlarını göster/gizle
+    document.querySelectorAll(".soru-kartı").forEach(function (kart) {
+        const tipSeçimi = kart.querySelector(".tip-seçimi");
+        if (!tipSeçimi) return;
+        const ölçekAlanı = kart.querySelector(".ölçek-alanı");
+        const seçenekAlanı = kart.querySelector(".seçenek-alanı");
+
+        function tipeGöreGüncelle() {
+            const seçiliTip = tipSeçimi.value;
+            if (ölçekAlanı) ölçekAlanı.hidden = (seçiliTip !== "ölçek");
+            if (seçenekAlanı) seçenekAlanı.hidden = (seçiliTip !== "çoktan seçmeli");
+        }
+
+        tipSeçimi.addEventListener("change", tipeGöreGüncelle);
+        tipeGöreGüncelle();
+
+        const ekleDüğmesi = kart.querySelector(".seçenek-ekle");
+        const seçenekKutuları = kart.querySelector(".seçenek-kutuları");
+        if (ekleDüğmesi && seçenekKutuları) {
+            ekleDüğmesi.addEventListener("click", function () {
+                const örnek = seçenekKutuları.querySelector("input");
+                const yeniGiriş = document.createElement("input");
+                yeniGiriş.type = "text";
+                yeniGiriş.name = örnek ? örnek.name : "seçenek";
+                seçenekKutuları.appendChild(yeniGiriş);
+            });
+        }
     });
 </script>
-{% endif %}
-
 {% endblock %}

@@ -1,0 +1,48 @@
+{% extends "taban.html" %}
+{% block başlık %}{{ anket.başlık }} — Kalıp türet{% endblock %}
+{% block kabuk_sınıfı %}sayfa-kabuğu--dar{% endblock %}
+{% block içerik %}
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>Anketten kalıp türet</h1>
+        <p class="başlık-şeridi__açıklama">
+            Kurallar anketten okunur; kalıp ile anket arasında kalıcı bir bağ kurulmaz.
+        </p>
+    </div>
+</div>
+
+{% if uyarı %}<div class="uyarı-kutusu">{{ uyarı }}</div>{% endif %}
+
+<div class="kağıt">
+    <p class="kağıt__başlık">Türetilecek kurallar</p>
+    <div class="satır" style="margin-top:9px">
+        <span class="çip {% if kurallar.açık_uçlu_izinli_mi %}çip--açık{% else %}çip--kapalı{% endif %}">Açık
+            uçlu</span>
+        <span class="çip {% if kurallar.ölçek_izinli_mi %}çip--açık{% else %}çip--kapalı{% endif %}">Ölçek</span>
+        <span class="çip {% if kurallar.evet_hayır_izinli_mi %}çip--açık{% else %}çip--kapalı{% endif %}">Evet/hayır</span>
+        <span class="çip {% if kurallar.çoktan_seçmeli_izinli_mi %}çip--açık{% else %}çip--kapalı{% endif %}">Çoktan
+            seçmeli</span>
+    </div>
+    <div class="kağıt__alt">
+        <span>{{ "Anonim" if kurallar.anonim_mi else "Kimlikli" }}</span>
+        <span>{{ "Herkese açık" if kurallar.herkese_açık_mı else "Tanımlanabilir" }}</span>
+        <span>{{ (kurallar.süre_gün ~ " gün") if kurallar.süre_gün else "Süresiz" }}</span>
+    </div>
+</div>
+
+<form method="post">
+    <div class="kağıt" style="margin-top:14px">
+        <div class="form-alanı" style="margin-bottom:0">
+            <label class="alan-başlığı" for="ad">Kalıp adı</label>
+            <input type="text" id="ad" name="ad" maxlength="100" value="{{ varsayılan_ad }}" required>
+        </div>
+    </div>
+
+    {% if onay_gerekiyor %}<input type="hidden" name="onaylandı_mı" value="1">{% endif %}
+
+    <div class="düğme-öbeği" style="margin-top:14px">
+        <button type="submit" class="düğme düğme--birincil">Kalıp olarak kaydet</button>
+        <a class="düğme" href="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">Ankete dön</a>
+    </div>
+</form>
+{% endblock %}

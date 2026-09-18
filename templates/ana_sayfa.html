@@ -1,21 +1,184 @@
 {% extends "taban.html" %}
+{% block başlık %}Ana sayfa — Anket{% endblock %}
+
+{% block şerit %}
+{% if zorunlu_bekleyenler %}
+<div class="uyarı-şeridi">
+    <div class="uyarı-şeridi__içi">
+        <span class="uyarı-şeridi__işareti">!</span>
+        <span>
+            <strong>{{ zorunlu_bekleyenler[0].başlık }}</strong> anketi size zorunlu olarak tanımlandı.
+            Bu anketi tamamlamadan başka anket yanıtlayamazsınız.
+        </span>
+        <a class="uyarı-şeridi__bağlantı"
+            href="{{ url_for('anket_yanıtlama', anket_kimlik=zorunlu_bekleyenler[0].kimlik) }}">Ankete git</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
 {% block içerik %}
-<h1>Anket Uygulaması</h1>
-{% if oturum_kullanıcısı %}
-<p><a href="{{ url_for('anket_oluşturma') }}">Yeni anket oluştur</a></p>
+{% if not oturum_kullanıcısı %}
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>Anket Uygulaması</h1>
+        <p class="başlık-şeridi__açıklama">
+            Anket oluşturun, ekibinize tanımlayın, yanıtları toplayın ve özetleyin.
+        </p>
+    </div>
+    <div class="başlık-şeridi__eylemler">
+        <a class="düğme düğme--birincil" href="{{ url_for('kayıt_ekranı') }}">Hesap oluştur</a>
+        <a class="düğme" href="{{ url_for('giriş_ekranı') }}">Giriş yap</a>
+    </div>
+</div>
+{% else %}
+
+<div class="sütunlar">
+
+    {# ------------------------------------------------ 1. Erişimdekiler #}
+    <section>
+        <div class="sütun-başlığı">
+            <h2>Erişimdekiler</h2>
+            <span class="işaret işaret--sayaç">{{ erişimdekiler|length }}</span>
+        </div>
+        <div class="yığın">
+            {% for satır in erişimdekiler %}
+            {% set anket = satır.anket %}
+            <a class="kağıt kağıt--tıklanır" href="{{ url_for('anket_yanıtlama', anket_kimlik=anket.kimlik) }}">
+                <span class="kağıt__başlık">
+                    {% if satır.zorunlu_mu %}<span class="uyarı-şeridi__işareti">!</span>{% endif %}
+                    {{ anket.başlık }}
+                </span>
+                {% if anket.açıklama %}<span class="kağıt__açıklama">{{ anket.açıklama }}</span>{% endif %}
+                <span class="kağıt__alt">
+                    {% if satır.zorunlu_mu %}<span class="işaret işaret--zorunlu">Zorunlu</span>{% endif %}
+                    {% if satır.sahip_epostası %}<span>{{ satır.sahip_epostası }}</span>{% endif %}
+                    <span>{% if anket.son_tarih %}Son gün {{ anket.son_tarih|tarih }}{% else %}Süresiz{% endif %}</span>
+                </span>
+            </a>
+            {% else %}
+            <p class="boş-durum">Şu an yanıtlayabileceğiniz anket yok.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    {# ---------------------------------------------------- 2. Anketlerim #}
+    <section>
+        <div class="sütun-başlığı">
+            <h2>Anketlerim</h2>
+            <div class="düğme-öbeği">
+                <a class="düğme düğme--birincil düğme--küçük" href="{{ url_for('anket_oluşturma') }}">Anket oluştur</a>
+                <a class="düğme düğme--küçük" href="{{ url_for('kalıp_listesi') }}">Kalıplar</a>
+            </div>
+        </div>
+
+        <p class="bölüm-başlığı bölüm-başlığı--ilk">Sahibi olduklarım</p>
+        <div class="yığın">
+            {% for anket in sahip_olduklarım %}
+            {% set gönderilmiş = anket.yanıtlar | selectattr('gönderildi_mi') | list | length %}
+            <a class="kağıt kağıt--tıklanır" href="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">
+                <span class="kağıt__başlık">{{ anket.başlık }}</span>
+                <span class="kağıt__açıklama">
+                    {% if anket.sorular %}
+                    {{ anket.açıklama or (anket.anonim_mi and "Anonim yanıtlanır." or "Kimlikli yanıtlanır.") }}
+                    {% else %}
+                    Henüz soru eklenmedi.
+                    {% endif %}
+                </span>
+                <span class="kağıt__alt">
+                    {% if anket.yayında_mı %}
+                    <span class="işaret işaret--yayında">Yayında</span>
+                    {% else %}
+                    <span class="işaret işaret--taslak">Yayında değil</span>
+                    {% endif %}
+                    <span>{{ anket.sorular|length }} soru</span>
+                    <span>{{ gönderilmiş }} yanıt</span>
+                    <span>{{ anket.yetkiler|length }} üye</span>
+                </span>
+            </a>
+            {% else %}
+            <p class="boş-durum">Henüz anket oluşturmadınız.</p>
+            {% endfor %}
+        </div>
+
+        <p class="bölüm-başlığı" style="margin-top:22px">Üye olduklarım</p>
+        <div class="yığın">
+            {% for üye_yetkisi in üyeliklerim %}
+            {% set anket = üye_yetkisi.anket %}
+            {% set izin_özeti = [] %}
+            {% if üye_yetkisi.yöneticilik_mi %}{% set atıldı = izin_özeti.append("Yöneticilik") %}{% endif %}
+            {% if üye_yetkisi.içerik_düzenleme_mi %}{% set atıldı = izin_özeti.append("İçerik düzenleme") %}{% endif %}
+            {% if üye_yetkisi.yayın_yönetimi_mi %}{% set atıldı = izin_özeti.append("Yayın yönetimi") %}{% endif %}
+            {% if üye_yetkisi.yanıtları_görme_mi %}{% set atıldı = izin_özeti.append("Yanıtları görme") %}{% endif %}
+            {% if üye_yetkisi.kullanıcı_tanımlama_mı %}{% set atıldı = izin_özeti.append("Kullanıcı tanımlama") %}{% endif %}
+            <a class="kağıt kağıt--tıklanır" href="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">
+                <span class="kağıt__başlık">{{ anket.başlık }}</span>
+                {% if anket.açıklama %}<span class="kağıt__açıklama">{{ anket.açıklama }}</span>{% endif %}
+                <span class="kağıt__alt">
+                    {% if anket.yayında_mı %}
+                    <span class="işaret işaret--yayında">Yayında</span>
+                    {% else %}
+                    <span class="işaret işaret--taslak">Yayında değil</span>
+                    {% endif %}
+                    <span>{{ izin_özeti|join(", ") if izin_özeti else "İzin verilmemiş" }}</span>
+                </span>
+            </a>
+            {% else %}
+            <p class="boş-durum">Üye olduğunuz anket yok.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    {# ----------------------------------------------- 3. Yanıtladıklarım #}
+    <section>
+        <div class="sütun-başlığı">
+            <h2>Yanıtladıklarım</h2>
+            <span class="işaret işaret--sayaç">{{ yanıtladıklarım|length }}</span>
+        </div>
+        <div class="yığın">
+            {% for satır in yanıtladıklarım %}
+            {% set yanıt = satır.yanıt %}
+            {% set anket = satır.anket %}
+            <a class="kağıt kağıt--tıklanır" href="{{ url_for('yanıt_sayfası', anket_kimlik=anket.kimlik) }}">
+                <span class="kağıt__başlık">
+                    {{ anket.başlık }}
+                    {% if yanıt.gönderildi_mi %}
+                    <span class="işaret işaret--taslak">Gönderildi</span>
+                    {% else %}
+                    <span class="işaret işaret--yarım">Yarım</span>
+                    {% endif %}
+                </span>
+                <span class="kağıt__açıklama">
+                    {% if yanıt.gönderildi_mi %}
+                    {% if anket.anonim_mi %}
+                    Anonim yanıtladınız. Verdiğiniz cevaplar yalnızca bu ekranda görünür.
+                    {% else %}
+                    {{ satır.toplam_soru }} sorudan {{ satır.cevaplanan }}'i cevaplandı.
+                    {% endif %}
+                    {% else %}
+                    {{ satır.toplam_soru }} sorudan {{ satır.cevaplanan }}'i cevaplandı.
+                    Gönderilmeden sonuçlara eklenmez.
+                    {% endif %}
+                    {% if satır.sahipsiz_mi %} Anket sahibi hesabını sildi.{% endif %}
+                </span>
+                <span class="kağıt__alt">
+                    {% if yanıt.gönderildi_mi and yanıt.gönderim_zamanı %}
+                    <span>Gönderim {{ yanıt.gönderim_zamanı|tarih }}</span>
+                    {% elif yanıt.oluşturma_zamanı %}
+                    <span>Son düzenleme {{ yanıt.oluşturma_zamanı|tarih }}</span>
+                    {% endif %}
+                    {% if anket.değerlendirilebilir_mi %}
+                    <span>{% if yanıt.değerlendirme_puanı is none %}Puan verilmedi{% else %}Puan {{
+                        yanıt.değerlendirme_puanı }}{% endif %}</span>
+                    {% endif %}
+                </span>
+            </a>
+            {% else %}
+            <p class="boş-durum">Henüz anket yanıtlamadınız.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+</div>
 {% endif %}
-
-{% if oturum_kullanıcısı %}
-<h2>Anketlerim</h2>
-<ul>
-    {% for anket in anketler %}
-    <li><a href="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">{{ anket.başlık }}</a></li>
-    {% else %}
-    <li>Henüz anketiniz yok.</li>
-    {% endfor %}
-</ul>
-{% endif %}
-
-<p><a href="{{ url_for('anket_listesi') }}">Anketleri gör</a></p>
-
 {% endblock %}

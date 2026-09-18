@@ -1,0 +1,72 @@
+{% extends "taban.html" %}
+{% block başlık %}{{ anket.başlık }} — Üyeler{% endblock %}
+{% block içerik %}
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>Üyeler</h1>
+        <p class="başlık-şeridi__açıklama">
+            {{ anket.başlık }} · Üyeler ankete verdiğiniz izinler ölçüsünde erişir.
+        </p>
+    </div>
+    <div class="başlık-şeridi__eylemler">
+        <a class="düğme düğme--küçük"
+            href="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">Ankete dön</a>
+    </div>
+</div>
+
+<div class="kağıt">
+    {% if üyelikler %}
+    <table class="çizelge">
+        <tr>
+            <th>E-posta</th>
+            <th>İçerik düzenleme</th>
+            <th>Yayın yönetimi</th>
+            <th>Yanıtları görme</th>
+            <th>Kullanıcı tanımlama</th>
+            <th>Yöneticilik</th>
+            <th></th>
+        </tr>
+        {% for üyelik in üyelikler %}
+        <tr>
+            <td>{{ üyelik.kullanıcı.e_posta if üyelik.kullanıcı else "Silinmiş kullanıcı" }}</td>
+            {% for alan_adı in ['içerik_düzenleme_mi', 'yayın_yönetimi_mi', 'yanıtları_görme_mi',
+            'kullanıcı_tanımlama_mı', 'yöneticilik_mi'] %}
+            <td>{% if üyelik[alan_adı] %}<span class="işaret işaret--yayında">Var</span>{% else %}<span
+                    class="yanıtlanmadı">—</span>{% endif %}</td>
+            {% endfor %}
+            <td class="çizelge__sağ">
+                <form class="satıriçi-form" method="post"
+                    action="{{ url_for('anket_üye_çıkarma', anket_kimlik=anket.kimlik, kullanici_kimlik=üyelik.kullanıcı_kimlik) }}">
+                    <button type="submit" class="düğme düğme--sessiz düğme--küçük">Çıkar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p class="boş-durum">Henüz üye yok.</p>
+    {% endif %}
+</div>
+
+<div class="kağıt" style="margin-top:14px">
+    <p class="kağıt__başlık">Üye ekle veya yetkilerini güncelle</p>
+    <p class="yardım-metni">Var olan bir üyenin e-postasını girerseniz yetkileri bu değerlerle değiştirilir.</p>
+    <form method="post" style="margin-top:12px">
+        <div class="form-alanı">
+            <label class="alan-başlığı" for="e_posta">E-posta</label>
+            <input type="email" id="e_posta" name="e_posta" required>
+        </div>
+        <label class="kutu-satırı"><input type="checkbox" name="içerik_düzenleme_mi"><span>İçerik
+                düzenleme</span></label>
+        <label class="kutu-satırı"><input type="checkbox" name="yayın_yönetimi_mi"><span>Yayın yönetimi</span></label>
+        <label class="kutu-satırı"><input type="checkbox" name="yanıtları_görme_mi"><span>Yanıtları görme</span></label>
+        <label class="kutu-satırı"><input type="checkbox" name="kullanıcı_tanımlama_mı"><span>Kullanıcı
+                tanımlama</span></label>
+        {% if sahip_mi %}
+        <label class="kutu-satırı"><input type="checkbox" name="yöneticilik_mi"><span>Yöneticilik</span></label>
+        <p class="yardım-metni">Yöneticilik iznini yalnızca anketin birincil sahibi verebilir.</p>
+        {% endif %}
+        <button type="submit" class="düğme düğme--birincil" style="margin-top:12px">Kaydet</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,12 +1,66 @@
 {% extends "taban.html" %}
-{% block başlık %}Yeni Anket{% endblock %}
+{% block başlık %}Yeni anket — Anket{% endblock %}
+{% block kabuk_sınıfı %}sayfa-kabuğu--dar{% endblock %}
 {% block içerik %}
-<h1>Yeni Anket</h1>
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>Yeni anket</h1>
+        <p class="başlık-şeridi__açıklama">
+            Kalıp seçerseniz anonimlik, erişim, süre ve izin verilen soru tipleri kalıptan kopyalanır.
+        </p>
+    </div>
+</div>
+
 <form method="post">
-    <p><label>Başlık <input type="text" name="başlık" maxlength="50" required></label></p>
-    <p><label>Açıklama <textarea name="açıklama"></textarea></label></p>
-    <p><label><input type="checkbox" name="anonim_mi"> Anonim</label></p>
-    <p><label><input type="checkbox" name="herkese_açık_mı"> Herkese açık</label></p>
-    <button type="submit">Oluştur</button>
+    <div class="kağıt">
+        <div class="form-alanı">
+            <label class="alan-başlığı" for="başlık">Başlık</label>
+            <input type="text" id="başlık" name="başlık" maxlength="50" required>
+        </div>
+        <div class="form-alanı">
+            <label class="alan-başlığı" for="açıklama">Açıklama</label>
+            <textarea id="açıklama" name="açıklama"></textarea>
+        </div>
+        <div class="form-alanı">
+            <label class="alan-başlığı" for="kalıp-seçimi">Kalıp</label>
+            <select id="kalıp-seçimi" name="kalıp_kimlik">
+                <option value="">Kalıp kullanma</option>
+                {% for kalıp in kalıplar %}
+                <option value="{{ kalıp.kimlik }}" {% if seçilen_kalıp_kimlik == kalıp.kimlik %}selected{% endif %}>
+                    {{ kalıp.ad }}{% if kalıp.sistem_kalıbı_mı %} (sistem){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="kalıpsız-alanı">
+            <label class="kutu-satırı"><input type="checkbox" name="anonim_mi"><span>Anonim yanıtlansın</span></label>
+            <label class="kutu-satırı"><input type="checkbox" name="herkese_açık_mı"><span>Herkese açık</span></label>
+        </div>
+        <p class="yardım-metni" id="kalıp-notu" hidden>
+            Bu ayarlar seçtiğiniz kalıptan kopyalanacak.
+        </p>
+    </div>
+
+    <div class="düğme-öbeği" style="margin-top:14px">
+        <button type="submit" class="düğme düğme--birincil">Oluştur</button>
+        <a class="düğme" href="{{ url_for('kalıp_listesi') }}">Kalıpları yönet</a>
+    </div>
 </form>
+
+<script>
+    const kalıpSeçimi = document.getElementById("kalıp-seçimi");
+    const kalıpsızAlanı = document.getElementById("kalıpsız-alanı");
+    const kalıpNotu = document.getElementById("kalıp-notu");
+
+    function kalıpDurumunuUygula() {
+        // Kalıp seçiliyse anonimlik ve erişim değerleri kalıptan kopyalanır
+        const seçiliMi = Boolean(kalıpSeçimi.value);
+        kalıpsızAlanı.hidden = seçiliMi;
+        kalıpNotu.hidden = !seçiliMi;
+    }
+
+    kalıpSeçimi.addEventListener("change", kalıpDurumunuUygula);
+    kalıpDurumunuUygula();
+</script>
 {% endblock %}

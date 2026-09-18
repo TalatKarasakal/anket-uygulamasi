@@ -1,29 +1,126 @@
 {% extends "taban.html" %}
-{% block başlık %}{{ anket.başlık }}{% endblock %}
+{% block başlık %}{{ anket.başlık }} — Yanıtla{% endblock %}
+{% block kabuk_sınıfı %}sayfa-kabuğu--dar{% endblock %}
+
+{% block şerit %}
+{% if bekleyenler %}
+<div class="uyarı-şeridi">
+    <div class="uyarı-şeridi__içi">
+        <span class="uyarı-şeridi__işareti">!</span>
+        <span>Tamamlamanız gereken zorunlu anketler var. Bunları bitirmeden başka anket yanıtlayamazsınız.</span>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
 {% block içerik %}
-<h1>{{ anket.başlık }}</h1>
-{% if anket.açıklama %}<p>{{ anket.açıklama }}</p>{% endif %}
-<form method="post">
-    {% for soru in anket.sorular %}
-    <p>
-        {{ soru.metin }}{% if soru.zorunlu_mu %} *{% endif %}<br>
-        {% if soru.tip == "açık uçlu" %}
-        <textarea name="soru_{{ soru.kimlik }}"></textarea>
-        {% elif soru.tip == "evet/hayır" %}
-        <label><input type="radio" name="soru_{{ soru.kimlik }}" value="evet"> Evet</label>
-        <label><input type="radio" name="soru_{{ soru.kimlik }}" value="hayır"> Hayır</label>
-        {% elif soru.tip == "ölçek" %}
-        <input type="number" name="soru_{{ soru.kimlik }}" min="{{ soru.ölçek_alt_sınırı }}"
-            max="{{ soru.ölçek_üst_sınırı }}">
-        ({{ soru.ölçek_alt_sınırı }}–{{ soru.ölçek_üst_sınırı }})
-        {% elif soru.tip == "çoktan seçmeli" %}
-        {% for seçenek in soru.seçenekler %}
-        <label><input type="radio" name="soru_{{ soru.kimlik }}" value="{{ seçenek.kimlik }}"> {{ seçenek.metin
-            }}</label>
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>{{ anket.başlık }}</h1>
+        {% if anket.açıklama %}<p class="başlık-şeridi__açıklama">{{ anket.açıklama }}</p>{% endif %}
+    </div>
+    <div class="başlık-şeridi__eylemler">
+        {% if anket.anonim_mi %}<span class="işaret">Anonim</span>{% endif %}
+        {% if anket.son_tarih %}<span class="işaret">Son gün {{ anket.son_tarih|tarih }}</span>{% endif %}
+    </div>
+</div>
+
+{% if uyarı %}<div class="uyarı-kutusu">{{ uyarı }}</div>{% endif %}
+
+{% if bekleyenler %}
+<div class="kağıt">
+    <p class="kağıt__başlık">Önce tamamlamanız gereken anketler</p>
+    <div class="yığın" style="margin-top:11px">
+        {% for bekleyen_kayıt in bekleyenler %}
+        <a class="kağıt kağıt--tıklanır"
+            href="{{ url_for('anket_yanıtlama', anket_kimlik=bekleyen_kayıt.kimlik) }}">
+            <span class="kağıt__başlık">{{ bekleyen_kayıt.başlık }}</span>
+            <span class="kağıt__alt">
+                <span class="işaret işaret--zorunlu">Zorunlu</span>
+                <span>{% if bekleyen_kayıt.son_tarih %}Son gün {{ bekleyen_kayıt.son_tarih|tarih }}{% else %}Süresiz{%
+                    endif %}</span>
+            </span>
+        </a>
         {% endfor %}
+    </div>
+</div>
+{% else %}
+
+<form method="post">
+    {% if soru_imzası %}<input type="hidden" name="soru_imzası" value="{{ soru_imzası }}">{% endif %}
+
+    {% for soru in anket.sorular %}
+    {% set cevap = cevaplar.get(soru.kimlik) if cevaplar else None %}
+    <div class="yanıt-sorusu">
+        <p class="yanıt-sorusu__metni">
+            {{ loop.index }}. {{ soru.metin }}{% if soru.zorunlu_mu %} <span class="zorunlu-işareti">*</span>{% endif %}
+        </p>
+
+        {% if soru.tip == "açık uçlu" %}
+        <textarea name="soru_{{ soru.kimlik }}">{{ cevap.metin_değeri if cevap and cevap.metin_değeri else "" }}</textarea>
+
+        {% elif soru.tip == "evet/hayır" %}
+        <div class="seçim-öbeği">
+            <label class="kutu-satırı">
+                <input type="radio" name="soru_{{ soru.kimlik }}" value="evet" {% if cevap and cevap.evet_hayır_değeri
+                    is sameas true %}checked{% endif %}>
+                <span>Evet</span>
+            </label>
+            <label class="kutu-satırı">
+                <input type="radio" name="soru_{{ soru.kimlik }}" value="hayır" {% if cevap and cevap.evet_hayır_değeri
+                    is sameas false %}checked{% endif %}>
+                <span>Hayır</span>
+            </label>
+        </div>
+
+        {% elif soru.tip == "ölçek" %}
+        <div class="satır">
+            <input class="dar-alan" type="number" name="soru_{{ soru.kimlik }}" min="{{ soru.ölçek_alt_sınırı }}"
+                max="{{ soru.ölçek_üst_sınırı }}"
+                value="{{ cevap.sayısal_değer if cevap and cevap.sayısal_değer is not none else '' }}">
+            <span class="yardım-metni" style="margin:0">{{ soru.ölçek_alt_sınırı }} – {{ soru.ölçek_üst_sınırı }}
+                arası</span>
+        </div>
+
+        {% elif soru.tip == "çoktan seçmeli" %}
+        <div class="seçim-öbeği">
+            {% for seçenek in soru.seçenekler %}
+            <label class="kutu-satırı">
+                <input type="radio" name="soru_{{ soru.kimlik }}" value="{{ seçenek.kimlik }}" {% if cevap and
+                    cevap.seçilen_seçenek_kimlik == seçenek.kimlik %}checked{% endif %}>
+                <span>{{ seçenek.metin }}</span>
+            </label>
+            {% endfor %}
+        </div>
         {% endif %}
-    </p>
+    </div>
+    {% else %}
+    <p class="boş-durum">Bu ankette henüz soru yok.</p>
     {% endfor %}
-    <button type="submit">Gönder</button>
+
+    {% if anket.değerlendirilebilir_mi %}
+    <div class="yanıt-sorusu">
+        <p class="yanıt-sorusu__metni">Anketi değerlendirin</p>
+        <div class="satır">
+            <input class="dar-alan" type="number" name="değerlendirme_puanı"
+                min="{{ anket.değerlendirme_alt_sınırı if anket.değerlendirme_alt_sınırı is not none else 0 }}"
+                max="{{ anket.değerlendirme_üst_sınırı if anket.değerlendirme_üst_sınırı is not none else 10 }}">
+            <span class="yardım-metni" style="margin:0">
+                {{ anket.değerlendirme_alt_sınırı if anket.değerlendirme_alt_sınırı is not none else 0 }} –
+                {{ anket.değerlendirme_üst_sınırı if anket.değerlendirme_üst_sınırı is not none else 10 }} arası.
+                Puan yalnızca gönderimde kaydedilir.
+            </span>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="gönderim-şeridi">
+        <button type="submit" class="düğme" name="eylem" value="kaydet">Kaydet</button>
+        <button type="submit" class="düğme düğme--birincil" name="eylem" value="gönder">Gönder</button>
+        <span class="yardım-metni" style="margin:0; align-self:center">
+            Kaydedilen yanıt sonuçlara eklenmez; gönderdikten sonra değiştirilemez.
+        </span>
+    </div>
 </form>
+{% endif %}
 {% endblock %}

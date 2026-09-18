@@ -27,13 +27,11 @@ class Anket(db.Model):
     değerlendirilebilir_mi = db.Column(db.Boolean, nullable=False, default=False)
     değerlendirme_alt_sınırı = db.Column(db.Integer, nullable=True, default=0)
     değerlendirme_üst_sınırı = db.Column(db.Integer, nullable=True, default=10)
+    kaynak_kalıp_adı = db.Column(db.String(100), nullable=True)
     sorular = db.relationship("Soru", back_populates="anket", cascade="all, delete-orphan", order_by="Soru.sıra")
-
-
     yanıtlar = db.relationship("Yanıt", back_populates="anket", cascade="all, delete-orphan")
     yetkiler = db.relationship("AnketYetki", back_populates="anket", cascade="all, delete-orphan")
     tanımlamalar = db.relationship("AnketTanımlama", back_populates="anket", cascade="all, delete-orphan")
-
 
 class Soru(db.Model):
     __tablename__ = "soru"
@@ -69,8 +67,6 @@ class Yanıt(db.Model):
     cevaplar = db.relationship("Cevap", back_populates="yanıt", cascade="all, delete-orphan")
     yanıtlayan = db.relationship("Kullanıcı")
     anket = db.relationship("Anket", back_populates="yanıtlar")
-
-
     
 class Cevap(db.Model):
     __tablename__ = "cevap"
@@ -96,7 +92,6 @@ class AnketYetki(db.Model):
     kullanıcı_tanımlama_mı = db.Column(db.Boolean, nullable=False, default=False)
     yöneticilik_mi = db.Column(db.Boolean, nullable=False, default=False)
     __table_args__ = (db.UniqueConstraint("anket_kimlik", "kullanıcı_kimlik"),)
-
     anket = db.relationship("Anket", back_populates="yetkiler")
     kullanıcı = db.relationship("Kullanıcı")
 
@@ -107,7 +102,6 @@ class AnketTanımlama(db.Model):
     kullanıcı_kimlik = db.Column(db.Integer, db.ForeignKey("kullanıcı.kimlik"), nullable=False)
     zorunlu_mu = db.Column(db.Boolean, nullable=False, default=False)
     __table_args__ = (db.UniqueConstraint("anket_kimlik", "kullanıcı_kimlik"),)
-
     anket = db.relationship("Anket", back_populates="tanımlamalar")
     kullanıcı = db.relationship("Kullanıcı")
 
@@ -125,7 +119,4 @@ class Kalıp(db.Model):
     herkese_açık_mı = db.Column(db.Boolean, nullable=False, default=False)
     süre_gün = db.Column(db.Integer, nullable=True)
     __table_args__ = (db.UniqueConstraint("sahip_kimlik", "ad"),)
-
     sahip = db.relationship("Kullanıcı", back_populates="kalıplar")
-
-

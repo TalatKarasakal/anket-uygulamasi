@@ -1,0 +1,64 @@
+{% extends "taban.html" %}
+{% block başlık %}{{ kalıp.ad }} — Kalıp düzenleme{% endblock %}
+{% block kabuk_sınıfı %}sayfa-kabuğu--dar{% endblock %}
+{% block içerik %}
+{% set biçim = form if form is defined and form else None %}
+{% set b_ad = biçim.get('ad', '') if biçim else kalıp.ad %}
+{% set b_süre = biçim.get('süre_gün', '') if biçim else (kalıp.süre_gün or '') %}
+{% set b_anonim = ('anonim_mi' in biçim) if biçim else kalıp.anonim_mi %}
+{% set b_herkese = ('herkese_açık_mı' in biçim) if biçim else kalıp.herkese_açık_mı %}
+
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>Kalıp düzenleme</h1>
+        <p class="başlık-şeridi__açıklama">
+            Buradaki değişiklikler, bu kalıptan daha önce üretilmiş anketleri etkilemez.
+        </p>
+    </div>
+</div>
+
+{% if uyarı %}<div class="uyarı-kutusu">{{ uyarı }}</div>{% endif %}
+
+<form method="post">
+    <div class="kağıt">
+        <div class="form-alanı">
+            <label class="alan-başlığı" for="ad">Kalıp adı</label>
+            <input type="text" id="ad" name="ad" maxlength="100" value="{{ b_ad }}" required>
+        </div>
+
+        <p class="kağıt__başlık" style="margin-top:18px">İzin verilen soru tipleri</p>
+        {% for alan_adı, alan_yazısı in [('açık_uçlu_izinli_mi', 'Açık uçlu'), ('ölçek_izinli_mi', 'Ölçek'),
+        ('evet_hayır_izinli_mi', 'Evet/hayır'), ('çoktan_seçmeli_izinli_mi', 'Çoktan seçmeli')] %}
+        {% set açık_mı = (alan_adı in biçim) if biçim else kalıp[alan_adı] %}
+        <label class="kutu-satırı">
+            <input type="checkbox" name="{{ alan_adı }}" {% if açık_mı %}checked{% endif %}>
+            <span>{{ alan_yazısı }}</span>
+        </label>
+        {% endfor %}
+
+        <hr class="ayraç" style="margin:16px 0">
+
+        <p class="kağıt__başlık">Yanıtlama ve erişim</p>
+        <label class="kutu-satırı">
+            <input type="checkbox" name="anonim_mi" {% if b_anonim %}checked{% endif %}>
+            <span>Anonim yanıtlansın</span>
+        </label>
+        <label class="kutu-satırı">
+            <input type="checkbox" name="herkese_açık_mı" {% if b_herkese %}checked{% endif %}>
+            <span>Herkese açık</span>
+        </label>
+
+        <div class="form-alanı" style="margin-top:14px; margin-bottom:0">
+            <label class="alan-başlığı" for="süre_gün">Süre (gün)</label>
+            <input class="dar-alan" type="number" id="süre_gün" name="süre_gün" min="1" value="{{ b_süre }}">
+        </div>
+    </div>
+
+    {% if onay_gerekiyor %}<input type="hidden" name="onaylandı_mı" value="1">{% endif %}
+
+    <div class="düğme-öbeği" style="margin-top:14px">
+        <button type="submit" class="düğme düğme--birincil">Güncelle</button>
+        <a class="düğme" href="{{ url_for('kalıp_listesi') }}">Vazgeç</a>
+    </div>
+</form>
+{% endblock %}

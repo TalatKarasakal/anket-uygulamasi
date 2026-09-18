@@ -1,24 +1,22 @@
 {% extends "taban.html" %}
-{% block başlık %}{{ anket.başlık }} — Yanıtım{% endblock %}
+{% block başlık %}{{ anket.başlık }} — {{ yanıtlayan_adı }}{% endblock %}
 {% block kabuk_sınıfı %}sayfa-kabuğu--dar{% endblock %}
 {% block içerik %}
 <div class="başlık-şeridi">
     <div class="başlık-şeridi__yazı">
-        <h1>{{ anket.başlık }}</h1>
+        <h1>{{ yanıtlayan_adı }}</h1>
         <p class="başlık-şeridi__açıklama">
-            {% if yanıt.gönderildi_mi %}
-            Yanıtınız gönderildi. Gönderilmiş yanıt değiştirilemez.
-            {% else %}
-            Taslak yanıtınız kaydedildi; henüz gönderilmedi ve sonuçlara dahil değil.
+            {{ anket.başlık }}
+            {% if zaman_gösterilsin and yanıt.gönderim_zamanı %} · Gönderim {{ yanıt.gönderim_zamanı|tarih }}{% endif %}
+            {% if anket.değerlendirilebilir_mi %}
+            · {% if yanıt.değerlendirme_puanı is none %}Puan verilmedi{% else %}Puan {{ yanıt.değerlendirme_puanı }}{%
+            endif %}
             {% endif %}
         </p>
     </div>
     <div class="başlık-şeridi__eylemler">
-        {% if yanıt.gönderildi_mi %}
-        <span class="işaret işaret--taslak">Gönderildi</span>
-        {% else %}
-        <span class="işaret işaret--yarım">Yarım</span>
-        {% endif %}
+        <a class="düğme düğme--küçük"
+            href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik) }}">Yanıtlara dön</a>
     </div>
 </div>
 
@@ -43,14 +41,4 @@
         {% endfor %}
     </dl>
 </div>
-
-{% if not yanıt.gönderildi_mi %}
-<div class="düğme-öbeği" style="margin-top:14px">
-    <a class="düğme düğme--birincil"
-        href="{{ url_for('anket_yanıtlama', anket_kimlik=anket.kimlik) }}">Yanıtlamaya dön</a>
-    <form class="satıriçi-form" method="post" action="{{ url_for('yanıt_silme', anket_kimlik=anket.kimlik) }}">
-        <button type="submit" class="düğme düğme--tehlike">Yanıtı sil</button>
-    </form>
-</div>
-{% endif %}
 {% endblock %}

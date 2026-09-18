@@ -1,0 +1,66 @@
+{% extends "taban.html" %}
+{% block başlık %}Kalıplar — Anket{% endblock %}
+{% block içerik %}
+
+{% macro kalıp_kartı(kalıp, kendi_kalıbım) %}
+<div class="kağıt">
+    <p class="kağıt__başlık">{{ kalıp.ad }}</p>
+    <div class="satır" style="margin-top:9px">
+        <span class="çip {% if kalıp.açık_uçlu_izinli_mi %}çip--açık{% else %}çip--kapalı{% endif %}">Açık uçlu</span>
+        <span class="çip {% if kalıp.ölçek_izinli_mi %}çip--açık{% else %}çip--kapalı{% endif %}">Ölçek</span>
+        <span class="çip {% if kalıp.evet_hayır_izinli_mi %}çip--açık{% else %}çip--kapalı{% endif %}">Evet/hayır</span>
+        <span class="çip {% if kalıp.çoktan_seçmeli_izinli_mi %}çip--açık{% else %}çip--kapalı{% endif %}">Çoktan
+            seçmeli</span>
+    </div>
+    <div class="kağıt__alt">
+        <span>{{ "Anonim" if kalıp.anonim_mi else "Kimlikli" }}</span>
+        <span>{{ "Herkese açık" if kalıp.herkese_açık_mı else "Tanımlanabilir" }}</span>
+        <span>{{ (kalıp.süre_gün ~ " gün") if kalıp.süre_gün else "Süresiz" }}</span>
+    </div>
+    <div class="düğme-öbeği" style="margin-top:12px">
+        <a class="düğme düğme--küçük"
+            href="{{ url_for('anket_oluşturma', kalip_kimlik=kalıp.kimlik) }}">Bu kalıptan anket</a>
+        {% if kendi_kalıbım %}
+        <a class="düğme düğme--küçük" href="{{ url_for('kalıp_düzenleme', kalip_kimlik=kalıp.kimlik) }}">Düzenle</a>
+        <form class="satıriçi-form" method="post" action="{{ url_for('kalıp_silme', kalip_kimlik=kalıp.kimlik) }}">
+            <button type="submit" class="düğme düğme--küçük düğme--tehlike">Sil</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}
+
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>Kalıplar</h1>
+        <p class="başlık-şeridi__açıklama">
+            Kalıbın kuralları anket oluşturulurken kopyalanır. Kalıbı sonradan değiştirmeniz,
+            o kalıptan üretilmiş anketleri etkilemez.
+        </p>
+    </div>
+    <div class="başlık-şeridi__eylemler">
+        <a class="düğme düğme--birincil" href="{{ url_for('kalıp_oluşturma') }}">Kalıp oluştur</a>
+    </div>
+</div>
+
+{% if uyarı %}<div class="uyarı-kutusu">{{ uyarı }}</div>{% endif %}
+
+<p class="bölüm-başlığı bölüm-başlığı--ilk">Sistem kalıpları</p>
+<p class="yardım-metni" style="margin-bottom:11px">Tüm kullanıcılara sunulur. Düzenlenemez ve silinemez.</p>
+<div class="ızgara">
+    {% for kalıp in sistem_kalıpları %}
+    {{ kalıp_kartı(kalıp, false) }}
+    {% else %}
+    <p class="boş-durum">Sistem kalıbı yok.</p>
+    {% endfor %}
+</div>
+
+<p class="bölüm-başlığı" style="margin-top:26px">Kendi kalıplarım</p>
+<div class="ızgara">
+    {% for kalıp in kullanıcı_kalıpları %}
+    {{ kalıp_kartı(kalıp, true) }}
+    {% else %}
+    <p class="boş-durum">Henüz kalıbınız yok.</p>
+    {% endfor %}
+</div>
+{% endblock %}

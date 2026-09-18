@@ -1,0 +1,77 @@
+{% extends "taban.html" %}
+{% block başlık %}Hesabı sil — Anket{% endblock %}
+{% block kabuk_sınıfı %}sayfa-kabuğu--dar{% endblock %}
+{% block içerik %}
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>Hesabı sil</h1>
+        <p class="başlık-şeridi__açıklama">
+            {{ kullanıcı.e_posta }} hesabı kalıcı olarak silinecek. Bu işlem geri alınamaz.
+        </p>
+    </div>
+</div>
+
+<form method="post">
+    <div class="kağıt kağıt--tehlike">
+        <p class="kağıt__başlık">Verdiğiniz yanıtlar</p>
+        <p class="yardım-metni">Toplam {{ yanıt_sayısı }} yanıtınız var.</p>
+        <label class="kutu-satırı">
+            <input type="radio" name="yanıtlar_karar" value="korunsun" checked>
+            <span>Korunsun — yanıtlar kalır, kimliğimle bağı kesilir</span>
+        </label>
+        <label class="kutu-satırı">
+            <input type="radio" name="yanıtlar_karar" value="silinsin">
+            <span>Silinsin — verdiğim tüm yanıtlar kaldırılır</span>
+        </label>
+    </div>
+
+    <p class="bölüm-başlığı" style="margin-top:22px">Sahibi olduğunuz anketler</p>
+
+    <div class="yığın">
+        {% for anket in anketler %}
+        <div class="kağıt">
+            <p class="kağıt__başlık">
+                {{ anket.başlık }}
+                {% if anket.yayında_mı %}<span class="işaret işaret--yayında">Yayında</span>{% endif %}
+            </p>
+            <p class="kağıt__alt">
+                <span>{{ anket.sorular|length }} soru</span>
+                <span>{{ anket.yanıtlar|length }} yanıt</span>
+                <span>{{ anket.yetkiler|length }} üye</span>
+            </p>
+
+            <label class="kutu-satırı" style="margin-top:9px">
+                <input type="radio" name="anket_{{ anket.kimlik }}_karar" value="silinsin" checked>
+                <span>Silinsin — anket ve tüm yanıtları kaldırılır</span>
+            </label>
+            <label class="kutu-satırı">
+                <input type="radio" name="anket_{{ anket.kimlik }}_karar" value="sahipsiz_kalsin">
+                <span>Sahipsiz kalsın — yayından alınır, yanıtlar korunur</span>
+            </label>
+            {% if anket.yetkiler %}
+            <label class="kutu-satırı">
+                <input type="radio" name="anket_{{ anket.kimlik }}_karar" value="devredilsin">
+                <span>Devredilsin</span>
+            </label>
+            <select name="anket_{{ anket.kimlik }}_devir" style="margin-left:26px; max-width:320px">
+                {% for üye_yetkisi in anket.yetkiler %}
+                <option value="{{ üye_yetkisi.kullanıcı_kimlik }}">
+                    {{ üye_yetkisi.kullanıcı.e_posta if üye_yetkisi.kullanıcı else "Silinmiş kullanıcı" }}
+                </option>
+                {% endfor %}
+            </select>
+            {% else %}
+            <p class="yardım-metni">Üyesi olmadığı için bu anket devredilemez.</p>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="boş-durum">Sahibi olduğunuz anket yok.</p>
+        {% endfor %}
+    </div>
+
+    <div class="düğme-öbeği" style="margin-top:18px">
+        <button type="submit" class="düğme düğme--tehlike">Hesabımı kalıcı olarak sil</button>
+        <a class="düğme" href="{{ url_for('ana_sayfa') }}">Vazgeç</a>
+    </div>
+</form>
+{% endblock %}

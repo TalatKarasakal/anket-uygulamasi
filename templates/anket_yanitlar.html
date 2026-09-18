@@ -1,39 +1,85 @@
 {% extends "taban.html" %}
 {% block başlık %}{{ anket.başlık }} — Yanıtlar{% endblock %}
 {% block içerik %}
-  <h1>{{ anket.başlık }}</h1>
-  <p>Toplam {{ yanıtlar|length }} yanıt.</p>
-  {% for yanıt in yanıtlar %}
-    <h2>
-      {% if yanıtlayanlar.get(yanıt.kimlik) %}
-        {{ yanıtlayanlar[yanıt.kimlik] }}
-      {% else %}
-        Yanıtlayan {{ loop.index }}
-      {% endif %}
-      <small>{{ yanıt.oluşturma_zamanı.strftime("%d.%m.%Y %H:%M") }}</small>
-    </h2>
-    {% set cevaplar = {} %}
-    {% for cevap in yanıt.cevaplar %}{% if cevaplar.update({cevap.soru_kimlik: cevap}) %}{% endif %}{% endfor %}
-    <dl>
-      {% for soru in anket.sorular %}
-        <dt>{{ soru.metin }}</dt>
-        <dd>
-          {% set cevap = cevaplar.get(soru.kimlik) %}
-          {% if not cevap %}
-            <em>Yanıtlanmadı</em>
-          {% elif soru.tip == "açık uçlu" %}
-            {{ cevap.metin_değeri }}
-          {% elif soru.tip == "evet/hayır" %}
-            {{ "Evet" if cevap.evet_hayır_değeri else "Hayır" }}
-          {% elif soru.tip == "ölçek" %}
-            {{ cevap.sayısal_değer }}
-          {% elif soru.tip == "çoktan seçmeli" %}
-            {{ cevap.seçenek.metin if cevap.seçenek else "—" }}
-          {% endif %}
-        </dd>
-      {% endfor %}
-    </dl>
-  {% else %}
-    <p>Henüz yanıt yok.</p>
-  {% endfor %}
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>{{ anket.başlık }}</h1>
+        <p class="başlık-şeridi__açıklama">
+            {% if anket.anonim_mi %}
+            Anonim anket. Yanıtlayanların kimliği hiçbir izin düzeyinde gösterilmez.
+            {% else %}
+            Kimlikli anket. Yanıtlayanlar e-postalarıyla listelenir.
+            {% endif %}
+        </p>
+    </div>
+    <div class="başlık-şeridi__eylemler">
+        {% if anket.yayında_mı %}
+        <span class="işaret işaret--yayında">Yayında</span>
+        {% else %}
+        <span class="işaret işaret--taslak">Yayında değil</span>
+        {% endif %}
+        <a class="düğme düğme--küçük"
+            href="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">Anketi düzenle</a>
+    </div>
+</div>
+
+<div class="sekme-çubuğu">
+    <a class="sekme-öğesi sekme-öğesi--etkin" href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik) }}">Kayıt bazında</a>
+    <a class="sekme-öğesi" href="{{ url_for('anket_özeti', anket_kimlik=anket.kimlik) }}">Özet</a>
+</div>
+
+{% if anket.değerlendirilebilir_mi %}
+<div class="satır" style="margin-bottom:18px">
+    <span class="alan-başlığı" style="margin:0">Sıralama</span>
+    <a class="düğme düğme--küçük {% if not sıralama %}düğme--birincil{% endif %}"
+        href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik) }}">Yanıt numarası</a>
+    <a class="düğme düğme--küçük {% if sıralama == 'puan_artan' %}düğme--birincil{% endif %}"
+        href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik, sıralama='puan_artan') }}">Puan artan</a>
+    <a class="düğme düğme--küçük {% if sıralama in ('puan_azalan', 'puan') %}düğme--birincil{% endif %}"
+        href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik, sıralama='puan_azalan') }}">Puan azalan</a>
+    {% if anket.anonim_mi %}
+    <span class="yardım-metni" style="margin:0">
+        Anonim ankette gönderim zamanı gösterilmez ve bu ölçüte göre sıralama yapılamaz.
+    </span>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if yanıtlar %}
+<table class="çizelge">
+    <tr>
+        <th>Yanıtlayan</th>
+        <th>Cevaplanan soru</th>
+        {% if zaman_gösterilsin %}<th>Gönderim</th>{% endif %}
+        {% if anket.değerlendirilebilir_mi %}<th>Değerlendirme</th>{% endif %}
+        <th></th>
+    </tr>
+    {% for yanıt in yanıtlar %}
+    <tr>
+        <td>
+            {% if anket.anonim_mi %}Anonim {{ numaralar[yanıt.kimlik] }}{% else %}{{ yanıtlayanlar[yanıt.kimlik] }}{%
+            endif %}
+        </td>
+        <td>{{ cevaplanan_sayıları[yanıt.kimlik] }} / {{ toplam_soru }}</td>
+        {% if zaman_gösterilsin %}
+        <td>{% if yanıt.gönderim_zamanı %}{{ yanıt.gönderim_zamanı|tarih }}{% else %}—{% endif %}</td>
+        {% endif %}
+        {% if anket.değerlendirilebilir_mi %}
+        <td>{% if yanıt.değerlendirme_puanı is none %}<span class="yanıtlanmadı">Puan verilmedi</span>{% else %}{{
+            yanıt.değerlendirme_puanı }}{% endif %}</td>
+        {% endif %}
+        <td class="çizelge__sağ">
+            <a href="{{ url_for('yanıt_detayı', anket_kimlik=anket.kimlik, yanit_kimlik=yanıt.kimlik) }}">Cevapları
+                gör</a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+<p class="yardım-metni" style="margin-top:14px">
+    {{ yanıtlar|length }} gönderilmiş yanıt listeleniyor. Gönderilmemiş yanıtlar bu listede yer almaz ve özete dahil
+    edilmez.
+</p>
+{% else %}
+<p class="boş-durum">Henüz gönderilmiş yanıt yok.</p>
+{% endif %}
 {% endblock %}

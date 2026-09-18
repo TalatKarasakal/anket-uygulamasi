@@ -1,12 +1,28 @@
 {% extends "taban.html" %}
-{% block başlık %}Anketler{% endblock %}
+{% block başlık %}Yanıtlanabilir anketler{% endblock %}
 {% block içerik %}
-<h1>Yanıtlanabilir Anketler</h1>
-<ul>
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>Yanıtlanabilir anketler</h1>
+        <p class="başlık-şeridi__açıklama">
+            Herkese açık olan ve size tanımlanan, süresi dolmamış yayındaki anketler.
+        </p>
+    </div>
+</div>
+
+<div class="ızgara">
     {% for anket in anketler %}
-    <li><a href="{{ url_for('anket_yanıtlama', anket_kimlik=anket.kimlik) }}">{{ anket.başlık }}</a></li>
+    <a class="kağıt kağıt--tıklanır" href="{{ url_for('anket_yanıtlama', anket_kimlik=anket.kimlik) }}">
+        <span class="kağıt__başlık">{{ anket.başlık }}</span>
+        {% if anket.açıklama %}<span class="kağıt__açıklama">{{ anket.açıklama }}</span>{% endif %}
+        <span class="kağıt__alt">
+            {% if anket.anonim_mi %}<span class="işaret">Anonim</span>{% endif %}
+            <span>{{ anket.sorular|length }} soru</span>
+            <span>{% if anket.son_tarih %}Son gün {{ anket.son_tarih|tarih }}{% else %}Süresiz{% endif %}</span>
+        </span>
+    </a>
     {% else %}
-    <li>Şu an yanıtlanabilir anket yok.</li>
+    <p class="boş-durum">Şu an yanıtlanabilir anket yok.</p>
     {% endfor %}
-</ul>
+</div>
 {% endblock %}

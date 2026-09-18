@@ -1,50 +1,141 @@
 {% extends "taban.html" %}
 {% block başlık %}{{ anket.başlık }} — Özet{% endblock %}
 {% block içerik %}
-  <h1>{{ anket.başlık }} — Özet</h1>
-  <p>Toplam {{ toplam_yanıt }} yanıt. Yüzdeler toplam yanıt sayısı üzerinden hesaplanmıştır;
-     soruyu boş bırakanlar da paydaya dâhildir.</p>
 
-  {% for soru in anket.sorular %}
-    {% set özet = özetler.get(soru.kimlik) %}
-    <h2>{{ soru.metin }}</h2>
-    {% if not özet %}
-      <p><em>Özet yok.</em></p>
-    {% else %}
-      <p>{{ özet.cevap_sayısı }} yanıtlandı, {{ özet.boş_sayısı }} boş.</p>
+{% macro çubuk(etiket, adet, yüzde, boş_mu=false) %}
+<div class="çubuk-satırı">
+    <span class="çubuk-satırı__etiketi">{{ etiket }}</span>
+    <span class="çubuk-satırı__yolu">
+        <span class="çubuk-satırı__dolgusu {% if boş_mu %}çubuk-satırı__dolgusu--boş{% endif %}"
+            style="width: {{ yüzde }}%"></span>
+    </span>
+    <span class="çubuk-satırı__sayısı">{{ adet }} · %{{ yüzde }}</span>
+</div>
+{% endmacro %}
 
-      {% if soru.tip == "açık uçlu" %}
-        <ul>
-          {% for metin in özet.metinler %}<li>{{ metin }}</li>
-          {% else %}<li><em>Cevap yok.</em></li>{% endfor %}
-        </ul>
-
-      {% elif soru.tip == "evet/hayır" %}
-        <ul>
-          <li>Evet: {{ özet.evet_sayısı }} (%{{ özet.evet_yüzde }})</li>
-          <li>Hayır: {{ özet.hayır_sayısı }} (%{{ özet.hayır_yüzde }})</li>
-        </ul>
-
-      {% elif soru.tip == "ölçek" %}
-        <p>Ortalama:
-          {% if özet.ortalama is none %}<em>ölçülmedi</em>{% else %}{{ özet.ortalama }}{% endif %}
-          ({{ soru.ölçek_alt_sınırı }}–{{ soru.ölçek_üst_sınırı }} arası)
+<div class="başlık-şeridi">
+    <div class="başlık-şeridi__yazı">
+        <h1>{{ anket.başlık }}</h1>
+        <p class="başlık-şeridi__açıklama">
+            {% if anket.anonim_mi %}Anonim anket. {% endif %}Özet yalnızca gönderilmiş yanıtları içerir.
         </p>
-        <table>
-          <tr><th>Değer</th><th>Adet</th><th>Yüzde</th></tr>
-          {% for satır in özet.dağılım %}
-            <tr><td>{{ satır.değer }}</td><td>{{ satır.adet }}</td><td>%{{ satır.yüzde }}</td></tr>
-          {% endfor %}
-        </table>
+    </div>
+    <div class="başlık-şeridi__eylemler">
+        {% if anket.yayında_mı %}
+        <span class="işaret işaret--yayında">Yayında</span>
+        {% else %}
+        <span class="işaret işaret--taslak">Yayında değil</span>
+        {% endif %}
+        <a class="düğme düğme--küçük"
+            href="{{ url_for('anket_duzenle', anket_kimlik=anket.kimlik) }}">Anketi düzenle</a>
+    </div>
+</div>
 
-      {% elif soru.tip == "çoktan seçmeli" %}
-        <table>
-          <tr><th>Seçenek</th><th>Adet</th><th>Yüzde</th></tr>
-          {% for satır in özet.dağılım %}
-            <tr><td>{{ satır.seçenek.metin }}</td><td>{{ satır.adet }}</td><td>%{{ satır.yüzde }}</td></tr>
-          {% endfor %}
-        </table>
-      {% endif %}
+<div class="sekme-çubuğu">
+    <a class="sekme-öğesi" href="{{ url_for('anket_yanıtları', anket_kimlik=anket.kimlik) }}">Kayıt bazında</a>
+    <a class="sekme-öğesi sekme-öğesi--etkin" href="{{ url_for('anket_özeti', anket_kimlik=anket.kimlik) }}">Özet</a>
+</div>
+
+<div class="sayaç-şeridi">
+    <div class="sayaç">
+        <div class="sayaç__değer">{{ toplam_yanıt }}</div>
+        <div class="sayaç__etiketi">Gönderilmiş yanıt</div>
+    </div>
+    <div class="sayaç">
+        <div class="sayaç__değer">{{ yarım_yanıt_sayısı }}</div>
+        <div class="sayaç__etiketi">Yarım yanıt (özete dahil değil)</div>
+    </div>
+    {% if değerlendirme_özeti %}
+    <div class="sayaç">
+        <div class="sayaç__değer">
+            {% if değerlendirme_özeti.ortalama is none %}—{% else %}{{ değerlendirme_özeti.ortalama }}{% endif %}
+        </div>
+        <div class="sayaç__etiketi">Değerlendirme ortalaması</div>
+    </div>
     {% endif %}
-  {% endfor %}
+</div>
+
+{% for soru in anket.sorular %}
+{% set özet = özetler.get(soru.kimlik) %}
+<div style="margin-bottom:30px">
+    <div class="satır" style="justify-content:space-between; align-items:baseline">
+        <h2>{{ loop.index }}. {{ soru.metin }}</h2>
+        <span class="yardım-metni" style="margin:0">
+            {{ soru.tip|capitalize }}{% if soru.tip == 'ölçek' %} {{ soru.ölçek_alt_sınırı }}–{{ soru.ölçek_üst_sınırı
+            }}{% endif %} · {{ özet.cevap_sayısı if özet else 0 }} cevap
+        </span>
+    </div>
+
+    {% if not özet %}
+    <p class="boş-durum" style="margin-top:12px">Özet yok.</p>
+
+    {% elif soru.tip == "açık uçlu" %}
+    {% if özet.metinler %}
+    <ul class="seçenek-listesi" style="margin-top:12px">
+        {% for metin in özet.metinler %}<li>{{ metin }}</li>{% endfor %}
+    </ul>
+    {% else %}
+    <p class="boş-durum" style="margin-top:12px">Cevap yok.</p>
+    {% endif %}
+
+    {% elif soru.tip == "evet/hayır" %}
+    <div class="çubuk-grafik">
+        {{ çubuk("Evet", özet.evet_sayısı, özet.evet_yüzde) }}
+        {{ çubuk("Hayır", özet.hayır_sayısı, özet.hayır_yüzde) }}
+        {% if özet.boş_sayısı %}
+        {{ çubuk("Boş bırakıldı", özet.boş_sayısı,
+        (özet.boş_sayısı / toplam_yanıt * 100) | round(1) if toplam_yanıt else 0, true) }}
+        {% endif %}
+    </div>
+
+    {% elif soru.tip == "ölçek" %}
+    <div class="çubuk-grafik">
+        {% for satır in özet.dağılım %}
+        {{ çubuk(satır.değer, satır.adet, satır.yüzde) }}
+        {% endfor %}
+        {% if özet.boş_sayısı %}
+        {{ çubuk("Boş bırakıldı", özet.boş_sayısı,
+        (özet.boş_sayısı / toplam_yanıt * 100) | round(1) if toplam_yanıt else 0, true) }}
+        {% endif %}
+    </div>
+    {% if özet.ortalama is not none %}
+    <p class="yardım-metni">Ortalama: {{ özet.ortalama }}</p>
+    {% endif %}
+
+    {% elif soru.tip == "çoktan seçmeli" %}
+    <div class="çubuk-grafik">
+        {% for satır in özet.dağılım %}
+        {{ çubuk(satır.seçenek.metin, satır.adet, satır.yüzde) }}
+        {% endfor %}
+        {% if özet.boş_sayısı %}
+        {{ çubuk("Boş bırakıldı", özet.boş_sayısı,
+        (özet.boş_sayısı / toplam_yanıt * 100) | round(1) if toplam_yanıt else 0, true) }}
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+
+<p class="yardım-metni">Yüzdeler {{ toplam_yanıt }} gönderilmiş yanıt üzerinden hesaplanır.</p>
+
+{% if değerlendirme_özeti %}
+<hr class="ayraç">
+<h2>Değerlendirme puanı</h2>
+<p class="yardım-metni" style="margin-bottom:12px">
+    {{ değerlendirme_özeti.puan_veren_sayısı }} yanıt puan verdi,
+    {{ değerlendirme_özeti.puan_vermeyen_sayısı }} yanıt puan vermedi
+    (%{{ değerlendirme_özeti.puan_vermeyen_oranı }}).
+</p>
+<div class="çubuk-grafik">
+    {% for satır in değerlendirme_özeti.dağılım %}
+    {{ çubuk(satır.değer, satır.adet, satır.yüzde) }}
+    {% endfor %}
+</div>
+
+{% if sahip_mi %}
+<form method="post" action="{{ url_for('puanları_silme', anket_kimlik=anket.kimlik) }}" style="margin-top:18px">
+    <button type="submit" class="düğme düğme--tehlike">Değerlendirme puanlarını sil</button>
+</form>
+{% endif %}
+{% endif %}
 {% endblock %}
