@@ -185,3 +185,6 @@ cython_debug/
 # macOS
 .DS_Store
 
+
+# Yerel geliştirme kısayolu (macOS, çift tıklayarak başlatma)
+Anketi Başlat.command
