@@ -69,6 +69,15 @@
         {% endfor %}
     </div>
 
+    <div class="kağıt kağıt--tehlike" style="margin-top:22px">
+        <p class="kağıt__başlık">Parolanızı doğrulayın</p>
+        <p class="yardım-metni">Hesap silme işlemi parolanın yeniden girilmesiyle onaylanır.</p>
+        <div class="form-alanı" style="margin-top:11px; margin-bottom:0; max-width:320px">
+            <label class="alan-başlığı" for="parola">Parola</label>
+            <input type="password" id="parola" name="parola" autocomplete="current-password" required>
+        </div>
+    </div>
+
     <div class="düğme-öbeği" style="margin-top:18px">
         <button type="submit" class="düğme düğme--tehlike">Hesabımı kalıcı olarak sil</button>
         <a class="düğme" href="{{ url_for('ana_sayfa') }}">Vazgeç</a>

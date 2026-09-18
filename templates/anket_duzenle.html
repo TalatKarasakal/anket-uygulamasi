@@ -140,8 +140,8 @@
                                     class="zorunlu-işareti">*</span>{% endif %}</p>
                             <p class="kağıt__alt" style="margin-top:5px">
                                 <span class="çip">{{ soru.tip }}</span>
-                                {% if soru.tip == 'ölçek' %}<span>{{ soru.ölçek_alt_sınırı }}–{{ soru.ölçek_üst_sınırı
-                                    }}</span>{% endif %}
+                                {% if soru.tip == 'ölçek' and soru.ölçek_alt_sınırı is not none and soru.ölçek_üst_sınırı is not none %}
+                                <span>{{ soru.ölçek_alt_sınırı }}–{{ soru.ölçek_üst_sınırı }}</span>{% endif %}
                             </p>
                             {% if soru.seçenekler %}
                             <ul class="seçenek-listesi">

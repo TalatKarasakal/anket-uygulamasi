@@ -294,6 +294,17 @@ def hesap_sil():
     ).scalar()
 
     if request.method == "POST":
+        # GG-10: işlem parolanın yeniden girilmesiyle onaylanır
+        parola = request.form.get("parola", "")
+        if not parola or not check_password_hash(kullanıcı.parola_özeti, parola):
+            return render_template(
+                "hesap_sil.html",
+                kullanıcı=kullanıcı,
+                anketler=anketler,
+                yanıt_sayısı=yanıt_sayısı,
+                hata="Parola doğrulanamadı",
+            )
+
         yanıtlar_karar = request.form.get("yanıtlar_karar", "korunsun")
         if yanıtlar_karar not in ("korunsun", "silinsin"):
             return render_template(
@@ -977,7 +988,12 @@ def anket_duzenle(anket_kimlik):
         return anket_duzenle_goster(
             anket, hata="İçerik ayarlarını değiştirme yetkiniz yoktur", form=request.form)
 
-    if içerik_yetkisi:
+    # P4: yalnızca formda o bölüm gerçekten gönderildiyse yazılır.
+    # Aksi hâlde yalnızca içerik alanları gönderen bir istek, yayın ayarlarını sıfırlardı.
+    içerik_gönderildi = içerik_yetkisi and "içerik_bölümü" in request.form
+    yayın_gönderildi = yayın_yetkisi and "yayın_bölümü" in request.form
+
+    if içerik_gönderildi:
         başlık = request.form.get("başlık", "").strip()
         if not başlık:
             return anket_duzenle_goster(anket, hata="Başlık boş bırakılamaz", form=request.form)
@@ -998,7 +1014,7 @@ def anket_duzenle(anket_kimlik):
                     db.session.rollback()
                     return anket_duzenle_goster(anket, hata=hata, form=request.form)
 
-    if yayın_yetkisi:
+    if yayın_gönderildi:
         anonim_mi = "anonim_mi" in request.form
         if anonim_mi != anket.anonim_mi:
             yanıt_var = db.session.execute(
@@ -1803,8 +1819,11 @@ def anket_özeti(anket_kimlik):
         elif soru.tip == "ölçek":
             değerler = [c.sayısal_değer for c in cevaplar if c.sayısal_değer is not None]
             ortalama = round(sum(değerler) / len(değerler), 2) if değerler else None
-            alt = soru.ölçek_alt_sınırı
-            üst = soru.ölçek_üst_sınırı
+            # Eski verideki sınırsız ölçek soruları None taşıyabilir; varsayılanlara düşülür
+            alt = soru.ölçek_alt_sınırı if soru.ölçek_alt_sınırı is not None else 0
+            üst = soru.ölçek_üst_sınırı if soru.ölçek_üst_sınırı is not None else 10
+            if üst < alt:
+                alt, üst = üst, alt
             dağılım = []
             for değer in range(alt, üst + 1):
                 adet = değerler.count(değer)
